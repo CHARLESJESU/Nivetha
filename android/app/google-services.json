@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "582445629498",
+    "project_id": "phoneauthfire-34a07",
+    "storage_bucket": "phoneauthfire-34a07.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:582445629498:android:816d99eecc14d96f2e3503",
+        "android_client_info": {
+          "package_name": "com.example.nivetha123"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBEwHmL7vCRvFhT0E4PgRuljZz8WeEc64Q"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
