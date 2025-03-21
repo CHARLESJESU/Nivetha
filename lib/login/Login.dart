@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:nivetha123/Pages/workprovider.dart';
 
 
-import '../Pages/firstpage.dart';
+
 import '../authendication/authentication.dart';
 import 'signup.dart';
 import 'forgot_password.dart'; // Import the new ForgotPasswordScreen
@@ -40,7 +41,7 @@ class _LoginScreenState extends State<LoginScreen> {
           errorMessage = '';
         });
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => Firstpage()),
+          MaterialPageRoute(builder: (context) => Workprovider()),
         );
       } else {
         setState(() {
@@ -73,8 +74,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 20),
                   const Text(
-                    "Welcome Come Back!",
-                    style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.black),
+                    "Welcome Back!",
+                    style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.black87),
                   ),
                   const SizedBox(height: 8),
                   const Text(
