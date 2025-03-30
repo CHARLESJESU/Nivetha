@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:nivetha123/Pages/workprovider.dart';
 
-
-
 import '../authendication/authentication.dart';
+import '../screens/name_job.dart';
+import '../screens/user_data.dart';
 import 'signup.dart';
 import 'forgot_password.dart'; // Import the new ForgotPasswordScreen
 
@@ -41,12 +41,15 @@ class _LoginScreenState extends State<LoginScreen> {
           errorMessage = '';
         });
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => Workprovider()),
+          MaterialPageRoute(
+            builder: (context) => Page1NameRole(userData: UserData()),
+          ),
         );
       } else {
         setState(() {
           isLoading = false;
-          errorMessage = 'User ID or Password is incorrect'; // Update error message
+          errorMessage =
+              'User ID or Password is incorrect'; // Update error message
         });
       }
     }
@@ -61,7 +64,10 @@ class _LoginScreenState extends State<LoginScreen> {
       body: SingleChildScrollView(
         child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 40.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 24.0,
+              vertical: 40.0,
+            ),
             child: Form(
               key: _formKey,
               child: Column(
@@ -75,7 +81,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 20),
                   const Text(
                     "Welcome Back!",
-                    style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.black87),
+                    style: TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   const Text(
@@ -83,9 +93,18 @@ class _LoginScreenState extends State<LoginScreen> {
                     style: TextStyle(fontSize: 16, color: Colors.black54),
                   ),
                   const SizedBox(height: 40),
-                  _buildTextField(emailController, 'Email', Icons.email_outlined),
+                  _buildTextField(
+                    emailController,
+                    'Email',
+                    Icons.email_outlined,
+                  ),
                   const SizedBox(height: 20),
-                  _buildTextField(passwordController, 'Password', Icons.lock_outline, isPass: true),
+                  _buildTextField(
+                    passwordController,
+                    'Password',
+                    Icons.lock_outline,
+                    isPass: true,
+                  ),
 
                   // Display the error message if present
                   if (errorMessage.isNotEmpty)
@@ -103,13 +122,19 @@ class _LoginScreenState extends State<LoginScreen> {
                       onTap: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => ForgotPasswordScreen()),
+                          MaterialPageRoute(
+                            builder: (context) => ForgotPasswordScreen(),
+                          ),
                         );
                       },
 
                       child: const Text(
                         "Forgot Password?",
-                        style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14, color: Colors.blue),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w500,
+                          fontSize: 14,
+                          color: Colors.blue,
+                        ),
                       ),
                     ),
                   ),
@@ -121,14 +146,26 @@ class _LoginScreenState extends State<LoginScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text("Don't have an account?", style: TextStyle(fontSize: 14)),
+                      const Text(
+                        "Don't have an account?",
+                        style: TextStyle(fontSize: 14),
+                      ),
                       GestureDetector(
                         onTap: () {
-                          Navigator.push(context, MaterialPageRoute(builder: (context) => const SignUpScreen()));
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const SignUpScreen(),
+                            ),
+                          );
                         },
                         child: const Text(
                           " Sign Up",
-                          style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14, color: Colors.blue),
+                          style: TextStyle(
+                            fontWeight: FontWeight.w500,
+                            fontSize: 14,
+                            color: Colors.blue,
+                          ),
                         ),
                       ),
                     ],
@@ -142,7 +179,12 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String hintText, IconData icon, {bool isPass = false}) {
+  Widget _buildTextField(
+    TextEditingController controller,
+    String hintText,
+    IconData icon, {
+    bool isPass = false,
+  }) {
     return TextFormField(
       controller: controller,
       obscureText: isPass,
@@ -167,7 +209,10 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         filled: true,
         fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          vertical: 14,
+          horizontal: 16,
+        ),
       ),
     );
   }
@@ -186,7 +231,11 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         child: Text(
           text,
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.white),
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
         ),
       ),
     );
