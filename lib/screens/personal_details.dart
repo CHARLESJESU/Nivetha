@@ -58,7 +58,11 @@ class _Page2PersonalDetailsState extends State<Page2PersonalDetails> {
         automaticallyImplyLeading: false,
         title: Text(
           'Personal Info',
-          style: TextStyle(fontSize: 25, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontSize: 25,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
         ),
         backgroundColor: Colors.blue,
         elevation: 0,
@@ -97,6 +101,7 @@ class _Page2PersonalDetailsState extends State<Page2PersonalDetails> {
                                 widget.userData.gender = value!;
                                 errorMessage = null;
                               });
+                              _validateAndProceed(); // Auto navigate after selection
                             },
                             activeColor: Colors.blue,
                           );

@@ -13,6 +13,7 @@ class Page1NameRole extends StatefulWidget {
 
 class _Page1NameRoleState extends State<Page1NameRole> {
   final _formKey = GlobalKey<FormState>();
+  String? selectedRole; // Store the selected role separately for validation
 
   @override
   Widget build(BuildContext context) {
@@ -22,7 +23,11 @@ class _Page1NameRoleState extends State<Page1NameRole> {
         automaticallyImplyLeading: false,
         title: Text(
           'User Profile',
-          style: TextStyle(fontSize: 25, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontSize: 25,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
         ),
         backgroundColor: Colors.blue,
         elevation: 0,
@@ -85,10 +90,13 @@ class _Page1NameRoleState extends State<Page1NameRole> {
                         RadioListTile<String>(
                           title: Text('Worker', style: TextStyle(fontSize: 16)),
                           value: 'Worker',
-                          groupValue: widget.userData.role,
-                          onChanged:
-                              (value) =>
-                                  setState(() => widget.userData.role = value!),
+                          groupValue: selectedRole,
+                          onChanged: (value) {
+                            setState(() {
+                              selectedRole = value;
+                              widget.userData.role = value!;
+                            });
+                          },
                           activeColor: Colors.blue,
                         ),
                         RadioListTile<String>(
@@ -97,14 +105,27 @@ class _Page1NameRoleState extends State<Page1NameRole> {
                             style: TextStyle(fontSize: 16),
                           ),
                           value: 'Job Provider',
-                          groupValue: widget.userData.role,
-                          onChanged:
-                              (value) =>
-                                  setState(() => widget.userData.role = value!),
+                          groupValue: selectedRole,
+                          onChanged: (value) {
+                            setState(() {
+                              selectedRole = value;
+                              widget.userData.role = value!;
+                            });
+                          },
                           activeColor: Colors.blue,
                         ),
                       ],
                     ),
+
+                    if (selectedRole ==
+                        null) // Show error message if no role selected
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8.0),
+                        child: Text(
+                          'Please select a role',
+                          style: TextStyle(color: Colors.red, fontSize: 14),
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -119,7 +140,7 @@ class _Page1NameRoleState extends State<Page1NameRole> {
               child: ElevatedButton(
                 onPressed: () {
                   if (_formKey.currentState!.validate() &&
-                      widget.userData.role != null) {
+                      selectedRole != null) {
                     Navigator.push(
                       context,
                       MaterialPageRoute(

@@ -32,6 +32,13 @@ class _Page4ProfileDetailsState extends State<Page4ProfileDetails> {
   }
 
   void _validateAndProceed() {
+    if (_image == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Please upload a profile picture!')),
+      );
+      return;
+    }
+
     if (experienceController.text.isEmpty) {
       setState(() {
         errorMessage = "Please enter your years of experience.";
@@ -57,7 +64,11 @@ class _Page4ProfileDetailsState extends State<Page4ProfileDetails> {
         automaticallyImplyLeading: false,
         title: Text(
           'Profile Info',
-          style: TextStyle(fontSize: 25, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontSize: 25,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
         ),
         backgroundColor: Colors.blue,
       ),

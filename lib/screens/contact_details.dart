@@ -22,6 +22,53 @@ class _Page3ContactDetailsState extends State<Page3ContactDetails> {
   TextEditingController addressController = TextEditingController();
   TextEditingController phoneController = TextEditingController();
 
+  void _validateAndProceed() {
+    String phone = phoneController.text.trim();
+
+    if (phone.isEmpty ||
+        areaController.text.isEmpty ||
+        addressController.text.isEmpty ||
+        countryController.text.isEmpty ||
+        stateController.text.isEmpty ||
+        cityController.text.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Please enter all details!')));
+      return;
+    }
+
+    if (phone.length != 10 || !RegExp(r'^[0-9]+$').hasMatch(phone)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Enter a valid 10-digit phone number!')),
+      );
+      return;
+    }
+
+    widget.userData.phoneNumber = '+91 ' + phone;
+    widget.userData.country = countryController.text;
+    widget.userData.state = stateController.text;
+    widget.userData.district = cityController.text;
+    widget.userData.city = cityController.text;
+    widget.userData.area = areaController.text;
+    widget.userData.address = addressController.text;
+
+    if (widget.userData.role == 'Worker') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => Page4ProfileDetails(userData: widget.userData),
+        ),
+      );
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => Page5Summary(userData: widget.userData),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -29,8 +76,13 @@ class _Page3ContactDetailsState extends State<Page3ContactDetails> {
         automaticallyImplyLeading: false,
         title: Text(
           'Contact Info',
-          style: TextStyle(fontSize: 25, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontSize: 25,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
         ),
+        backgroundColor: Colors.blue,
       ),
       body: Column(
         children: [
@@ -58,11 +110,10 @@ class _Page3ContactDetailsState extends State<Page3ContactDetails> {
                       border: OutlineInputBorder(),
                     ),
                     keyboardType: TextInputType.phone,
-                    onChanged:
-                        (value) => widget.userData.phoneNumber = '+91 ' + value,
+                    maxLength: 10,
                   ),
 
-                  SizedBox(height: 20),
+                  SizedBox(height: 10),
 
                   // 📍 Area Input
                   Text(
@@ -77,7 +128,6 @@ class _Page3ContactDetailsState extends State<Page3ContactDetails> {
                       border: OutlineInputBorder(),
                     ),
                     keyboardType: TextInputType.text,
-                    onChanged: (value) => widget.userData.area = value,
                   ),
 
                   SizedBox(height: 20),
@@ -95,7 +145,6 @@ class _Page3ContactDetailsState extends State<Page3ContactDetails> {
                       border: OutlineInputBorder(),
                     ),
                     keyboardType: TextInputType.text,
-                    onChanged: (value) => widget.userData.address = value,
                   ),
 
                   SizedBox(height: 20),
@@ -142,35 +191,7 @@ class _Page3ContactDetailsState extends State<Page3ContactDetails> {
                 SizedBox(width: 10),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () {
-                      widget.userData.country = countryController.text;
-                      widget.userData.state = stateController.text;
-                      widget.userData.district = cityController.text;
-                      widget.userData.city = cityController.text;
-                      widget.userData.area = areaController.text;
-                      widget.userData.address = addressController.text;
-
-                      if (widget.userData.role == 'Worker') {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder:
-                                (context) => Page4ProfileDetails(
-                                  userData: widget.userData,
-                                ),
-                          ),
-                        );
-                      } else {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder:
-                                (context) =>
-                                    Page5Summary(userData: widget.userData),
-                          ),
-                        );
-                      }
-                    },
+                    onPressed: _validateAndProceed,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue,
                       padding: EdgeInsets.symmetric(vertical: 15),
