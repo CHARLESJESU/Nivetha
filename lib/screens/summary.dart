@@ -114,6 +114,11 @@ class _Page5SummaryState extends State<Page5Summary> {
                 ),
               ),
             SizedBox(height: 20),
+            Text(
+              'Personal Information',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 10),
             _buildInfoRow('Name:', widget.userData.name),
             _buildInfoRow('Role:', widget.userData.role),
             _buildInfoRow('Gender:', widget.userData.gender),
@@ -123,6 +128,11 @@ class _Page5SummaryState extends State<Page5Summary> {
                   "Not Set",
             ),
             SizedBox(height: 20),
+            Text(
+              'Contact Details',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 10),
             _buildInfoRow('Phone:', widget.userData.phoneNumber),
             _buildInfoRow('Country:', widget.userData.country),
             _buildInfoRow('State:', widget.userData.state),
@@ -130,8 +140,13 @@ class _Page5SummaryState extends State<Page5Summary> {
             _buildInfoRow('City:', widget.userData.city),
             _buildInfoRow('Area:', widget.userData.area),
             _buildInfoRow('Address:', widget.userData.address),
-            if (widget.userData.role == 'Worker')
-              _buildInfoRow('Experience:', widget.userData.experience),
+            if (widget.userData.role == 'Worker') SizedBox(height: 20),
+            Text(
+              'Experience',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 10),
+            _buildInfoRow('Experience:', widget.userData.experience),
             SizedBox(height: 20),
             Row(
               children: [
