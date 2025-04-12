@@ -15,10 +15,10 @@ Future<void> main() async {
   if (Platform.isAndroid) {
     await Firebase.initializeApp(
       options: const FirebaseOptions(
-        apiKey: 'AIzaSyBEwHmL7vCRvFhT0E4PgRuljZz8WeEc64Q',
-        appId: '1:582445629498:android:816d99eecc14d96f2e3503',
-        messagingSenderId: '582445629498',
-        projectId: 'phoneauthfire-34a07',
+        apiKey: 'AIzaSyD2NdzsbCi-XnhYHV0WAyCUkJyxmabyE7M',
+        appId: '1:228919231041:android:2446454b88391cc640bcc0',
+        messagingSenderId: '228919231041',
+        projectId: 'dinnertonight-3d9ce',
       ),
     );
   } else {

@@ -124,7 +124,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   }
 
   bool isValidPassword(String password) {
-    return RegExp(r'^(?=.*[A-Za-z])(?=.*\d)(?=.*[@\$!%*?&])[A-Za-z\d@$!%*?&]{8,}$')
+    return RegExp(r'^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*?&_])[A-Za-z\d@$!%*?&_]{8,}$')
         .hasMatch(password);
   }
 

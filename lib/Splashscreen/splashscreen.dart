@@ -4,8 +4,9 @@ import 'package:nivetha123/Pages/workacceptor.dart';
 import 'package:nivetha123/Pages/workprovider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-
 import '../login/Login.dart';
+import '../screens/name_job.dart';
+import '../screens/user_data.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -27,8 +28,12 @@ class _SplashScreenState extends State<SplashScreen> {
     bool isworker = prefs.getBool('isworker') ?? false;
 
     Future.delayed(const Duration(seconds: 1), () {
-
-      isLoggedIn?(isworker ? Get.off(Workacceptor()) : Get.off(Workprovider())):Get.off(LoginScreen());
+      isLoggedIn
+          ? (isworker
+              ? Get.off(Workacceptor())
+              : //Get.off(Workprovider())
+              Get.off(Page1NameRole(userData: UserData())))
+          : Get.off(LoginScreen());
     });
   }
 
