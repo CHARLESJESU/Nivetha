@@ -8,7 +8,8 @@ import '../widgets/step_progress.dart';
 
 class Page5Summary extends StatefulWidget {
   final UserData userData;
-  Page5Summary({required this.userData});
+
+  const Page5Summary({Key? key, required this.userData}) : super(key: key);
 
   @override
   _Page5SummaryState createState() => _Page5SummaryState();
@@ -58,9 +59,11 @@ class _Page5SummaryState extends State<Page5Summary> {
 
     try {
       await _database.child("users").push().set(userDataMap);
-      Navigator.push(
+      Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => CheckboxAnimationPage(success: true)),
+        MaterialPageRoute(
+          builder: (context) => CheckboxAnimationPage(success:true,userData:widget.userData),
+        ),
       );
     } catch (error) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -75,20 +78,20 @@ class _Page5SummaryState extends State<Page5Summary> {
       appBar: AppBar(
         automaticallyImplyLeading: false,
         backgroundColor: Colors.blue,
-        title: Text(
+        title: const Text(
           'Profile Overview',
           style: TextStyle(fontSize: 25, fontWeight: FontWeight.bold, color: Colors.white),
         ),
       ),
       body: SingleChildScrollView(
-        padding: EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             StepProgress(currentStep: 5, totalSteps: 5),
-            SizedBox(height: 20),
-            Text('Review Your Details', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            Divider(),
+            const SizedBox(height: 20),
+            const Text('Review Your Details', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Divider(),
             if (widget.userData.role == 'Worker')
               Center(
                 child: CircleAvatar(
@@ -98,13 +101,13 @@ class _Page5SummaryState extends State<Page5Summary> {
                       ? FileImage(File(widget.userData.profileImage!))
                       : null,
                   child: widget.userData.profileImage == null
-                      ? Icon(Icons.person, size: 65, color: Colors.blue)
+                      ? const Icon(Icons.person, size: 65, color: Colors.blue)
                       : null,
                 ),
               ),
-            SizedBox(height: 20),
-            Text('Personal Information', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            SizedBox(height: 10),
+            const SizedBox(height: 20),
+            const Text('Personal Information', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 10),
             _buildInfoRow('Name:', widget.userData.name),
             _buildInfoRow('Role:', widget.userData.role),
             _buildInfoRow('Gender:', widget.userData.gender),
@@ -112,9 +115,9 @@ class _Page5SummaryState extends State<Page5Summary> {
               'DOB:',
               widget.userData.dob?.toLocal().toString().split(' ')[0] ?? "Not Set",
             ),
-            SizedBox(height: 20),
-            Text('Contact Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            SizedBox(height: 10),
+            const SizedBox(height: 20),
+            const Text('Contact Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 10),
             _buildInfoRow('Phone:', widget.userData.phoneNumber),
             _buildInfoRow('Country:', widget.userData.country),
             _buildInfoRow('State:', widget.userData.state),
@@ -123,12 +126,12 @@ class _Page5SummaryState extends State<Page5Summary> {
             _buildInfoRow('Area:', widget.userData.area),
             _buildInfoRow('Address:', widget.userData.address),
             if (widget.userData.role == 'Worker') ...[
-              SizedBox(height: 20),
-              Text('Experience', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              SizedBox(height: 10),
+              const SizedBox(height: 20),
+              const Text('Experience', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 10),
               _buildInfoRow('Experience:', widget.userData.experience),
             ],
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
             CheckboxListTile(
               value: termsAccepted,
               onChanged: (value) {
@@ -137,11 +140,11 @@ class _Page5SummaryState extends State<Page5Summary> {
                 });
               },
               controlAffinity: ListTileControlAffinity.leading,
-              title: Text('I accept the Terms & Conditions'),
+              title: const Text('I accept the Terms & Conditions'),
               contentPadding: EdgeInsets.zero,
               activeColor: Colors.blue,
             ),
-            SizedBox(height: 10),
+            const SizedBox(height: 10),
             Row(
               children: [
                 Expanded(
@@ -151,10 +154,10 @@ class _Page5SummaryState extends State<Page5Summary> {
                       backgroundColor: Colors.blue,
                       foregroundColor: Colors.white,
                     ),
-                    child: Text('Back'),
+                    child: const Text('Back'),
                   ),
                 ),
-                SizedBox(width: 10),
+                const SizedBox(width: 10),
                 Expanded(
                   child: ElevatedButton(
                     onPressed: termsAccepted ? _saveToFirebase : null,
@@ -162,7 +165,7 @@ class _Page5SummaryState extends State<Page5Summary> {
                       backgroundColor: termsAccepted ? Colors.blue : Colors.grey,
                       foregroundColor: Colors.white,
                     ),
-                    child: Text('Submit'),
+                    child: const Text('Submit'),
                   ),
                 ),
               ],
@@ -175,11 +178,11 @@ class _Page5SummaryState extends State<Page5Summary> {
 
   Widget _buildInfoRow(String label, String value) {
     return Padding(
-      padding: EdgeInsets.only(bottom: 8.0),
+      padding: const EdgeInsets.only(bottom: 8.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(fontWeight: FontWeight.bold)),
+          Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
           Expanded(
             child: Text(
               value.isNotEmpty ? value : 'Not provided',

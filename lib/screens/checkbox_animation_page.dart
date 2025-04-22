@@ -1,9 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:nivetha123/screens/home_page.dart';
+import 'package:nivetha123/screens/user_data.dart';
 
 class CheckboxAnimationPage extends StatefulWidget {
   final bool success;
+  final UserData? userData; // Made nullable
 
-  const CheckboxAnimationPage({Key? key, required this.success}) : super(key: key);
+  const CheckboxAnimationPage({
+    Key? key,
+    required this.success,
+    this.userData, // Optional parameter now
+  }) : super(key: key);
 
   @override
   _CheckboxAnimationPageState createState() => _CheckboxAnimationPageState();
@@ -21,6 +28,18 @@ class _CheckboxAnimationPageState extends State<CheckboxAnimationPage> {
         setState(() {
           isChecked = true;
         });
+
+        // Navigate to HomeScreen after animation
+        Future.delayed(Duration(seconds: 1), () {
+          if (widget.userData != null) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => HomeScreen(userData: widget.userData!),
+              ),
+            );
+          }
+        });
       });
     }
   }
@@ -28,14 +47,14 @@ class _CheckboxAnimationPageState extends State<CheckboxAnimationPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white, // Optional: for clean background
+      backgroundColor: Colors.white,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             AnimatedCheckbox(
               value: isChecked,
-              autoPlay: !widget.success,
+              autoPlay: widget.success,
               onChanged: (value) {
                 setState(() {
                   isChecked = value;
@@ -54,11 +73,9 @@ class _CheckboxAnimationPageState extends State<CheckboxAnimationPage> {
             if (!widget.success)
               ElevatedButton(
                 onPressed: () {
-                  setState(() {
-                    isChecked = true;
-                  });
+                  Navigator.pop(context); // Navigate back if unsuccessful
                 },
-                child: Text("Submit"),
+                child: Text("Go Back"),
               )
           ],
         ),
