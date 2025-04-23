@@ -5,6 +5,8 @@ import 'package:nivetha123/screens/user_data.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../login/Login.dart';
+
 class Jobproviderpage extends StatefulWidget {
   final UserData userData;
 
@@ -156,9 +158,43 @@ class _HomeScreenState extends State<Jobproviderpage> {
               ListTile(
                 leading: Icon(Icons.logout),
                 title: Text('Logout'),
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.of(context).popUntil((route) => route.isFirst);
+                onTap: () async {
+                  bool shouldLogout = await showDialog(
+                    context: context,
+                    builder: (context) {
+                      return AlertDialog(
+                        title: Text("Confirm Logout"),
+                        content: Text("Are you sure you want to logout?"),
+                        actions: [
+                          TextButton(
+                            onPressed: () {
+                              Navigator.of(context).pop(false); // Cancel logout
+                            },
+                            child: Text("Cancel"),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              Navigator.of(context).pop(true); // Confirm logout
+                            },
+                            child: Text("Confirm"),
+                          ),
+                        ],
+                      );
+                    },
+                  );
+
+                  if (shouldLogout == true) {
+                    SharedPreferences prefs = await SharedPreferences.getInstance();
+                    await prefs.setBool('isLoggedIn', false);
+
+
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const LoginScreen(),
+                      ),
+                    );
+                  }
                 },
               ),
               Divider(),
