@@ -3,17 +3,18 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:nivetha123/screens/user_data.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-class HomeScreen extends StatefulWidget {
+class Jobproviderpage extends StatefulWidget {
   final UserData userData;
 
-  const HomeScreen({Key? key, required this.userData}) : super(key: key);
+  const Jobproviderpage({Key? key, required this.userData}) : super(key: key);
 
   @override
   _HomeScreenState createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<Jobproviderpage> {
   late UserData userData;
   int _backPressCounter = 0;
   DateTime? _lastBackPressed;
@@ -22,8 +23,13 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     userData = widget.userData;
+    _initializePreferences();
   }
-
+  void _initializePreferences() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isLoggedIn', true);
+    await prefs.setBool('isworker', false);
+  }
   Future<void> _pickImage() async {
     final picker = ImagePicker();
     final XFile? image = await showModalBottomSheet<XFile?>(
@@ -105,7 +111,7 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Scaffold(
         key: _scaffoldKey,
         appBar: AppBar(
-          title: Text('Welcome, ${userData.name}'),
+          title: Text('Welcome Job provider, ${userData.name}'),
           backgroundColor: Colors.blue,
           leading: IconButton(
             icon: _buildProfileAvatar(radius: 20),

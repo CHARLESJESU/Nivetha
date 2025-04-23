@@ -1,6 +1,9 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
-import 'package:nivetha123/screens/home_page.dart';
+import 'package:nivetha123/Pages/workerpage.dart';
 import 'package:nivetha123/screens/user_data.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class CheckboxAnimationPage extends StatefulWidget {
   final bool success;
@@ -30,12 +33,15 @@ class _CheckboxAnimationPageState extends State<CheckboxAnimationPage> {
         });
 
         // Navigate to HomeScreen after animation
-        Future.delayed(Duration(seconds: 1), () {
+        Future.delayed(Duration(seconds: 1), () async {
           if (widget.userData != null) {
+            final prefs = await SharedPreferences.getInstance();
+            String jsonData = jsonEncode(widget.userData!.toJson());
+            await prefs.setString('userData', jsonData);
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(
-                builder: (context) => HomeScreen(userData: widget.userData!),
+                builder: (context) => Workerpage(userData: widget.userData!),
               ),
             );
           }

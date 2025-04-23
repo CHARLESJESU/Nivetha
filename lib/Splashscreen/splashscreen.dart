@@ -1,7 +1,11 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:nivetha123/Pages/workacceptor.dart';
-import 'package:nivetha123/Pages/workprovider.dart';
+import 'package:nivetha123/Pages/jobproviderpage.dart';
+
+import 'package:nivetha123/Pages/workerpage.dart';
+
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../login/Login.dart';
@@ -16,6 +20,7 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  UserData? userData;
   @override
   void initState() {
     super.initState();
@@ -26,13 +31,18 @@ class _SplashScreenState extends State<SplashScreen> {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     bool isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
     bool isworker = prefs.getBool('isworker') ?? false;
+    String? userDataJson = prefs.getString('userData');
+    if (userDataJson != null) {
+      Map<String, dynamic> jsonMap = jsonDecode(userDataJson);
+      userData = UserData.fromJson(jsonMap);
+    }
 
     Future.delayed(const Duration(seconds: 1), () {
       isLoggedIn
           ? (isworker
-              ? Get.off(Workacceptor())
-              : //Get.off(Workprovider())
-              Get.off(Page1NameRole(userData: UserData())))
+              ? Get.off(Workerpage(userData: userData!))
+              : Get.off(Jobproviderpage(userData: userData!)))
+             // Get.off(Page1NameRole(userData: UserData())))
           : Get.off(LoginScreen());
     });
   }
