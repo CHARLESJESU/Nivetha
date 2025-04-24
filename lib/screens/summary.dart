@@ -52,7 +52,7 @@ class _Page5SummaryState extends State<Page5Summary> {
 
     do {
       final random =
-          (1000 + (DateTime.now().millisecondsSinceEpoch % 1000)).toString();
+          (1000 + (DateTime.now().millisecondsSinceEpoch % 10)).toString();
       userId = '$prefix$random';
       if (!existingIds.contains(userId)) {
         isUnique = true;
