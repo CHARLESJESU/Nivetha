@@ -147,7 +147,6 @@ class _Page5SummaryState extends State<Page5Summary> {
             ),
             const Divider(),
 
-            // Worker profile image + ID
             if (widget.userData.role == 'Worker') ...[
               Center(
                 child: CircleAvatar(
@@ -169,28 +168,54 @@ class _Page5SummaryState extends State<Page5Summary> {
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 10),
-                child: Center(
-                  child: Text(
-                    'ID: $generatedUserId',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                child: Column(
+                  children: [
+                    const Text(
+                      'ID:',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 4),
+                    Text(
+                      generatedUserId.isNotEmpty
+                          ? generatedUserId
+                          : 'Generating...',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
 
-            // Job Provider ID above details
             if (widget.userData.role != 'Worker')
               Padding(
                 padding: const EdgeInsets.only(bottom: 10),
-                child: Text(
-                  'ID: $generatedUserId',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'ID:',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      generatedUserId.isNotEmpty
+                          ? generatedUserId
+                          : 'Generating...',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
               ),
 
