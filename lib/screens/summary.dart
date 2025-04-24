@@ -56,9 +56,16 @@ class _Page5SummaryState extends State<Page5Summary> {
     }
 
     do {
-      final random =
-          (1000 + (DateTime.now().millisecondsSinceEpoch % 9000)).toString();
-      userId = '$prefix$random';
+      // Generate a timestamp-based user ID with padding to ensure consistent length
+      final timestamp = DateTime.now().millisecondsSinceEpoch
+          .toString()
+          .padLeft(13, '0');
+      final randomPart = timestamp.substring(
+        timestamp.length - 4,
+      ); // Get the last 4 digits
+      userId =
+          '$prefix$randomPart'; // Use prefix + last 4 digits of the timestamp
+
       if (!existingIds.contains(userId)) {
         isUnique = true;
       }
