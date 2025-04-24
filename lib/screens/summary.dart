@@ -172,13 +172,26 @@ class _Page5SummaryState extends State<Page5Summary> {
                     style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    generatedUserId.isNotEmpty
-                        ? generatedUserId
-                        : 'Generating...',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.blue, width: 1),
+                    ),
+                    child: Text(
+                      generatedUserId.isNotEmpty
+                          ? generatedUserId
+                          : 'Generating...',
+                      style: const TextStyle(
+                        fontSize: 25,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue,
+                      ),
+                      textAlign: TextAlign.center,
                     ),
                   ),
                 ],
