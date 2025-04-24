@@ -18,7 +18,8 @@ class Page5Summary extends StatefulWidget {
 class _Page5SummaryState extends State<Page5Summary> {
   bool termsAccepted = false;
   final DatabaseReference _database = FirebaseDatabase.instance.ref();
-  late String generatedUserId = '';
+  String generatedUserId = '';
+  bool isUserIdLoading = true; // New flag to track if userId is being generated
 
   @override
   void initState() {
@@ -27,10 +28,14 @@ class _Page5SummaryState extends State<Page5Summary> {
   }
 
   void _initializeUserId() async {
-    final id = await _generateUniqueUserId(widget.userData.role);
-    setState(() {
-      generatedUserId = id;
-    });
+    if (generatedUserId.isEmpty) {
+      final id = await _generateUniqueUserId(widget.userData.role);
+      setState(() {
+        generatedUserId = id;
+        isUserIdLoading =
+            false; // Set loading flag to false once userId is generated
+      });
+    }
   }
 
   Future<String> _generateUniqueUserId(String role) async {
@@ -52,7 +57,7 @@ class _Page5SummaryState extends State<Page5Summary> {
 
     do {
       final random =
-          (1000 + (DateTime.now().millisecondsSinceEpoch % 10)).toString();
+          (1000 + (DateTime.now().millisecondsSinceEpoch % 9000)).toString();
       userId = '$prefix$random';
       if (!existingIds.contains(userId)) {
         isUnique = true;
@@ -186,17 +191,20 @@ class _Page5SummaryState extends State<Page5Summary> {
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: Colors.blue, width: 1),
                     ),
-                    child: Text(
-                      generatedUserId.isNotEmpty
-                          ? generatedUserId
-                          : 'Generating...',
-                      style: const TextStyle(
-                        fontSize: 25,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
+                    child:
+                        isUserIdLoading
+                            ? const CircularProgressIndicator() // Show loading indicator while generating ID
+                            : Text(
+                              generatedUserId.isNotEmpty
+                                  ? generatedUserId
+                                  : 'Generating...',
+                              style: const TextStyle(
+                                fontSize: 25,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blue,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
                   ),
                 ],
               ),
