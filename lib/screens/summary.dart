@@ -147,78 +147,45 @@ class _Page5SummaryState extends State<Page5Summary> {
             ),
             const Divider(),
 
-            if (widget.userData.role == 'Worker') ...[
-              Center(
-                child: CircleAvatar(
-                  radius: 65,
-                  backgroundColor: Colors.grey[200],
-                  backgroundImage:
-                      widget.userData.profileImage != null
-                          ? FileImage(File(widget.userData.profileImage!))
-                          : null,
-                  child:
-                      widget.userData.profileImage == null
-                          ? const Icon(
-                            Icons.person,
-                            size: 65,
-                            color: Colors.blue,
-                          )
-                          : null,
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                child: Column(
-                  children: [
-                    const Text(
-                      'ID:',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
+            Center(
+              child: Column(
+                children: [
+                  CircleAvatar(
+                    radius: 65,
+                    backgroundColor: Colors.grey[200],
+                    backgroundImage:
+                        widget.userData.profileImage != null
+                            ? FileImage(File(widget.userData.profileImage!))
+                            : null,
+                    child:
+                        widget.userData.profileImage == null
+                            ? const Icon(
+                              Icons.person,
+                              size: 65,
+                              color: Colors.blue,
+                            )
+                            : null,
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'User ID',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    generatedUserId.isNotEmpty
+                        ? generatedUserId
+                        : 'Generating...',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      generatedUserId.isNotEmpty
-                          ? generatedUserId
-                          : 'Generating...',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
+            ),
 
-            if (widget.userData.role != 'Worker')
-              Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'ID:',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      generatedUserId.isNotEmpty
-                          ? generatedUserId
-                          : 'Generating...',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
+            const SizedBox(height: 25),
             const Text(
               'Personal Information',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
@@ -232,6 +199,7 @@ class _Page5SummaryState extends State<Page5Summary> {
               widget.userData.dob?.toLocal().toString().split(' ')[0] ??
                   "Not Set",
             ),
+
             const SizedBox(height: 20),
             const Text(
               'Contact Details',
