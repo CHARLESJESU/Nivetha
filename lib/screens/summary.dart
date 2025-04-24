@@ -77,7 +77,8 @@ class _Page5SummaryState extends State<Page5Summary> {
     if (!termsAccepted) return;
 
     String? base64Image;
-    if (widget.userData.profileImage != null &&
+    if (widget.userData.role == 'Worker' &&
+        widget.userData.profileImage != null &&
         widget.userData.profileImage!.isNotEmpty) {
       base64Image = await _convertImageToBase64(widget.userData.profileImage!);
     }
@@ -150,23 +151,26 @@ class _Page5SummaryState extends State<Page5Summary> {
             Center(
               child: Column(
                 children: [
-                  CircleAvatar(
-                    radius: 65,
-                    backgroundColor: Colors.grey[200],
-                    backgroundImage:
-                        widget.userData.profileImage != null
-                            ? FileImage(File(widget.userData.profileImage!))
-                            : null,
-                    child:
-                        widget.userData.profileImage == null
-                            ? const Icon(
-                              Icons.person,
-                              size: 65,
-                              color: Colors.blue,
-                            )
-                            : null,
-                  ),
-                  const SizedBox(height: 12),
+                  if (widget.userData.role == 'Worker')
+                    CircleAvatar(
+                      radius: 65,
+                      backgroundColor: Colors.grey[200],
+                      backgroundImage:
+                          widget.userData.profileImage != null
+                              ? FileImage(File(widget.userData.profileImage!))
+                              : null,
+                      child:
+                          widget.userData.profileImage == null
+                              ? const Icon(
+                                Icons.person,
+                                size: 65,
+                                color: Colors.blue,
+                              )
+                              : null,
+                    ),
+                  if (widget.userData.role == 'Worker')
+                    const SizedBox(height: 12),
+
                   const Text(
                     'User ID',
                     style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
