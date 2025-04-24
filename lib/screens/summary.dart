@@ -19,7 +19,7 @@ class _Page5SummaryState extends State<Page5Summary> {
   bool termsAccepted = false;
   final DatabaseReference _database = FirebaseDatabase.instance.ref();
   String generatedUserId = '';
-  bool isUserIdLoading = true; // New flag to track if userId is being generated
+  bool isUserIdLoading = true;
 
   @override
   void initState() {
@@ -32,8 +32,7 @@ class _Page5SummaryState extends State<Page5Summary> {
       final id = await _generateUniqueUserId(widget.userData.role);
       setState(() {
         generatedUserId = id;
-        isUserIdLoading =
-            false; // Set loading flag to false once userId is generated
+        isUserIdLoading = false;
       });
     }
   }
@@ -79,7 +78,7 @@ class _Page5SummaryState extends State<Page5Summary> {
   }
 
   void _saveToFirebase() async {
-    if (!termsAccepted) return;
+    if (!termsAccepted || isUserIdLoading) return;
 
     String? base64Image;
     if (widget.userData.role == 'Worker' &&
@@ -193,7 +192,7 @@ class _Page5SummaryState extends State<Page5Summary> {
                     ),
                     child:
                         isUserIdLoading
-                            ? const CircularProgressIndicator() // Show loading indicator while generating ID
+                            ? const CircularProgressIndicator()
                             : Text(
                               generatedUserId.isNotEmpty
                                   ? generatedUserId
@@ -278,10 +277,15 @@ class _Page5SummaryState extends State<Page5Summary> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: termsAccepted ? _saveToFirebase : null,
+                    onPressed:
+                        (termsAccepted && !isUserIdLoading)
+                            ? _saveToFirebase
+                            : null,
                     style: ElevatedButton.styleFrom(
                       backgroundColor:
-                          termsAccepted ? Colors.blue : Colors.grey,
+                          (termsAccepted && !isUserIdLoading)
+                              ? Colors.blue
+                              : Colors.grey,
                       foregroundColor: Colors.white,
                     ),
                     child: const Text('Submit'),
