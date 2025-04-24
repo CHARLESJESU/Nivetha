@@ -1,13 +1,15 @@
-import 'dart:convert'; // For Base64 encoding
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:nivetha123/screens/user_data.dart';
+import 'package:nivetha123/screens/checkbox_animation_page.dart';
 import '../widgets/step_progress.dart';
 
 class Page5Summary extends StatefulWidget {
   final UserData userData;
-  Page5Summary({required this.userData});
+
+  const Page5Summary({Key? key, required this.userData}) : super(key: key);
 
   @override
   _Page5SummaryState createState() => _Page5SummaryState();
@@ -17,7 +19,6 @@ class _Page5SummaryState extends State<Page5Summary> {
   bool termsAccepted = false;
   final DatabaseReference _database = FirebaseDatabase.instance.ref();
 
-  /// ✅ Convert Image to Base64
   Future<String?> _convertImageToBase64(String imagePath) async {
     try {
       File imageFile = File(imagePath);
@@ -50,25 +51,25 @@ class _Page5SummaryState extends State<Page5Summary> {
       "city": widget.userData.city,
       "area": widget.userData.area,
       "address": widget.userData.address,
-      "experience":
-          widget.userData.role == 'Worker' ? widget.userData.experience : "N/A",
+      "experience": widget.userData.role == 'Worker'
+          ? widget.userData.experience
+          : "N/A",
       "profileImageBase64": base64Image ?? "No Image",
     };
 
-    _database
-        .child("users")
-        .push()
-        .set(userDataMap)
-        .then((_) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('Data saved successfully!')));
-        })
-        .catchError((error) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to save data: $error')),
-          );
-        });
+    try {
+      await _database.child("users").push().set(userDataMap);
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CheckboxAnimationPage(success:true,userData:widget.userData),
+        ),
+      );
+    } catch (error) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to save data: $error')),
+      );
+    }
   }
 
   @override
@@ -77,62 +78,46 @@ class _Page5SummaryState extends State<Page5Summary> {
       appBar: AppBar(
         automaticallyImplyLeading: false,
         backgroundColor: Colors.blue,
-        title: Text(
+        title: const Text(
           'Profile Overview',
-          style: TextStyle(
-            fontSize: 25,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
+          style: TextStyle(fontSize: 25, fontWeight: FontWeight.bold, color: Colors.white),
         ),
       ),
       body: SingleChildScrollView(
-        padding: EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             StepProgress(currentStep: 5, totalSteps: 5),
-            SizedBox(height: 20),
-            Text(
-              'Review Your Details',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            Divider(),
+            const SizedBox(height: 20),
+            const Text('Review Your Details', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Divider(),
             if (widget.userData.role == 'Worker')
               Center(
                 child: CircleAvatar(
                   radius: 65,
                   backgroundColor: Colors.grey[200],
-                  backgroundImage:
-                      widget.userData.profileImage != null
-                          ? FileImage(File(widget.userData.profileImage!))
-                          : null,
-                  child:
-                      widget.userData.profileImage == null
-                          ? Icon(Icons.person, size: 65, color: Colors.blue)
-                          : null,
+                  backgroundImage: widget.userData.profileImage != null
+                      ? FileImage(File(widget.userData.profileImage!))
+                      : null,
+                  child: widget.userData.profileImage == null
+                      ? const Icon(Icons.person, size: 65, color: Colors.blue)
+                      : null,
                 ),
               ),
-            SizedBox(height: 20),
-            Text(
-              'Personal Information',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 10),
+            const SizedBox(height: 20),
+            const Text('Personal Information', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 10),
             _buildInfoRow('Name:', widget.userData.name),
             _buildInfoRow('Role:', widget.userData.role),
             _buildInfoRow('Gender:', widget.userData.gender),
             _buildInfoRow(
               'DOB:',
-              widget.userData.dob?.toLocal().toString().split(' ')[0] ??
-                  "Not Set",
+              widget.userData.dob?.toLocal().toString().split(' ')[0] ?? "Not Set",
             ),
-            SizedBox(height: 20),
-            Text(
-              'Contact Details',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 10),
+            const SizedBox(height: 20),
+            const Text('Contact Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 10),
             _buildInfoRow('Phone:', widget.userData.phoneNumber),
             _buildInfoRow('Country:', widget.userData.country),
             _buildInfoRow('State:', widget.userData.state),
@@ -140,52 +125,47 @@ class _Page5SummaryState extends State<Page5Summary> {
             _buildInfoRow('City:', widget.userData.city),
             _buildInfoRow('Area:', widget.userData.area),
             _buildInfoRow('Address:', widget.userData.address),
-            if (widget.userData.role == 'Worker') SizedBox(height: 20),
-            Text(
-              'Experience',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            if (widget.userData.role == 'Worker') ...[
+              const SizedBox(height: 20),
+              const Text('Experience', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 10),
+              _buildInfoRow('Experience:', widget.userData.experience),
+            ],
+            const SizedBox(height: 20),
+            CheckboxListTile(
+              value: termsAccepted,
+              onChanged: (value) {
+                setState(() {
+                  termsAccepted = value ?? false;
+                });
+              },
+              controlAffinity: ListTileControlAffinity.leading,
+              title: const Text('I accept the Terms & Conditions'),
+              contentPadding: EdgeInsets.zero,
+              activeColor: Colors.blue,
             ),
-            SizedBox(height: 10),
-            _buildInfoRow('Experience:', widget.userData.experience),
-            SizedBox(height: 20),
+            const SizedBox(height: 10),
             Row(
-              children: [
-                Checkbox(
-                  value: termsAccepted,
-                  onChanged: (value) {
-                    setState(() {
-                      termsAccepted = value!;
-                    });
-                  },
-                ),
-                Expanded(child: Text('I accept the Terms & Conditions')),
-              ],
-            ),
-            SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () => Navigator.pop(context),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
                     ),
-                    child: Text('Back', style: TextStyle(color: Colors.white)),
+                    child: const Text('Back'),
                   ),
                 ),
-                SizedBox(width: 10),
+                const SizedBox(width: 10),
                 Expanded(
                   child: ElevatedButton(
                     onPressed: termsAccepted ? _saveToFirebase : null,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor:
-                          termsAccepted ? Colors.blue : Colors.grey,
+                      backgroundColor: termsAccepted ? Colors.blue : Colors.grey,
+                      foregroundColor: Colors.white,
                     ),
-                    child: Text(
-                      'Submit',
-                      style: TextStyle(color: Colors.white),
-                    ),
+                    child: const Text('Submit'),
                   ),
                 ),
               ],
@@ -198,11 +178,11 @@ class _Page5SummaryState extends State<Page5Summary> {
 
   Widget _buildInfoRow(String label, String value) {
     return Padding(
-      padding: EdgeInsets.only(bottom: 8.0),
+      padding: const EdgeInsets.only(bottom: 8.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(fontWeight: FontWeight.bold)),
+          Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
           Expanded(
             child: Text(
               value.isNotEmpty ? value : 'Not provided',

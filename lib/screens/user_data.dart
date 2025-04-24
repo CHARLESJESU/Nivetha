@@ -29,6 +29,43 @@ class UserData {
     this.experience = '',
     this.profileImage = '',
   });
+// ✅ TO JSON
+  Map<String, dynamic> toJson() {
+    return {
+      'name': name,
+      'role': role,
+      'gender': gender,
+      'dob': dob?.toIso8601String(), // Convert DateTime to string
+      'country': country,
+      'state': state,
+      'district': district,
+      'city': city,
+      'address': address,
+      'area': area,
+      'phoneNumber': phoneNumber,
+      'experience': experience,
+      'profileImage': profileImage,
+    };
+  }
+
+  // ✅ FROM JSON
+  factory UserData.fromJson(Map<String, dynamic> json) {
+    return UserData(
+      name: json['name'] ?? '',
+      role: json['role'] ?? '',
+      gender: json['gender'] ?? '',
+      dob: json['dob'] != null ? DateTime.parse(json['dob']) : null,
+      country: json['country'] ?? 'India',
+      state: json['state'] ?? '',
+      district: json['district'] ?? '',
+      city: json['city'] ?? '',
+      address: json['address'] ?? '',
+      area: json['area'] ?? '',
+      phoneNumber: json['phoneNumber'] ?? '+91',
+      experience: json['experience'] ?? '',
+      profileImage: json['profileImage'] ?? '',
+    );
+  }
 
   set contactImage(String contactImage) {}
 
