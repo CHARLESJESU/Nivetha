@@ -18,6 +18,49 @@ class Page5Summary extends StatefulWidget {
 class _Page5SummaryState extends State<Page5Summary> {
   bool termsAccepted = false;
   final DatabaseReference _database = FirebaseDatabase.instance.ref();
+  late String generatedUserId = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeUserId();
+  }
+
+  void _initializeUserId() async {
+    final id = await _generateUniqueUserId(widget.userData.role);
+    setState(() {
+      generatedUserId = id;
+    });
+  }
+
+  Future<String> _generateUniqueUserId(String role) async {
+    String prefix = role == 'Worker' ? 'WO' : 'JO';
+    String userId;
+    bool isUnique = false;
+
+    final usersSnapshot = await _database.child("users").get();
+    final existingIds = <String>{};
+
+    if (usersSnapshot.exists) {
+      for (final child in usersSnapshot.children) {
+        final data = child.value as Map;
+        if (data.containsKey("userId")) {
+          existingIds.add(data["userId"]);
+        }
+      }
+    }
+
+    do {
+      final random =
+          (1000 + (DateTime.now().millisecondsSinceEpoch % 9000)).toString();
+      userId = '$prefix$random';
+      if (!existingIds.contains(userId)) {
+        isUnique = true;
+      }
+    } while (!isUnique);
+
+    return userId;
+  }
 
   Future<String?> _convertImageToBase64(String imagePath) async {
     try {
@@ -40,6 +83,7 @@ class _Page5SummaryState extends State<Page5Summary> {
     }
 
     Map<String, dynamic> userDataMap = {
+      "userId": generatedUserId,
       "name": widget.userData.name,
       "role": widget.userData.role,
       "gender": widget.userData.gender,
@@ -51,9 +95,8 @@ class _Page5SummaryState extends State<Page5Summary> {
       "city": widget.userData.city,
       "area": widget.userData.area,
       "address": widget.userData.address,
-      "experience": widget.userData.role == 'Worker'
-          ? widget.userData.experience
-          : "N/A",
+      "experience":
+          widget.userData.role == 'Worker' ? widget.userData.experience : "N/A",
       "profileImageBase64": base64Image ?? "No Image",
     };
 
@@ -62,13 +105,17 @@ class _Page5SummaryState extends State<Page5Summary> {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (context) => CheckboxAnimationPage(success:true,userData:widget.userData),
+          builder:
+              (context) => CheckboxAnimationPage(
+                success: true,
+                userData: widget.userData,
+              ),
         ),
       );
     } catch (error) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to save data: $error')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to save data: $error')));
     }
   }
 
@@ -80,7 +127,11 @@ class _Page5SummaryState extends State<Page5Summary> {
         backgroundColor: Colors.blue,
         title: const Text(
           'Profile Overview',
-          style: TextStyle(fontSize: 25, fontWeight: FontWeight.bold, color: Colors.white),
+          style: TextStyle(
+            fontSize: 25,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
         ),
       ),
       body: SingleChildScrollView(
@@ -90,33 +141,77 @@ class _Page5SummaryState extends State<Page5Summary> {
           children: [
             StepProgress(currentStep: 5, totalSteps: 5),
             const SizedBox(height: 20),
-            const Text('Review Your Details', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text(
+              'Review Your Details',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
             const Divider(),
-            if (widget.userData.role == 'Worker')
+
+            // Worker profile image + ID
+            if (widget.userData.role == 'Worker') ...[
               Center(
                 child: CircleAvatar(
                   radius: 65,
                   backgroundColor: Colors.grey[200],
-                  backgroundImage: widget.userData.profileImage != null
-                      ? FileImage(File(widget.userData.profileImage!))
-                      : null,
-                  child: widget.userData.profileImage == null
-                      ? const Icon(Icons.person, size: 65, color: Colors.blue)
-                      : null,
+                  backgroundImage:
+                      widget.userData.profileImage != null
+                          ? FileImage(File(widget.userData.profileImage!))
+                          : null,
+                  child:
+                      widget.userData.profileImage == null
+                          ? const Icon(
+                            Icons.person,
+                            size: 65,
+                            color: Colors.blue,
+                          )
+                          : null,
                 ),
               ),
-            const SizedBox(height: 20),
-            const Text('Personal Information', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                child: Center(
+                  child: Text(
+                    'ID: $generatedUserId',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+
+            // Job Provider ID above details
+            if (widget.userData.role != 'Worker')
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Text(
+                  'ID: $generatedUserId',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+
+            const Text(
+              'Personal Information',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 10),
             _buildInfoRow('Name:', widget.userData.name),
             _buildInfoRow('Role:', widget.userData.role),
             _buildInfoRow('Gender:', widget.userData.gender),
             _buildInfoRow(
               'DOB:',
-              widget.userData.dob?.toLocal().toString().split(' ')[0] ?? "Not Set",
+              widget.userData.dob?.toLocal().toString().split(' ')[0] ??
+                  "Not Set",
             ),
             const SizedBox(height: 20),
-            const Text('Contact Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const Text(
+              'Contact Details',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 10),
             _buildInfoRow('Phone:', widget.userData.phoneNumber),
             _buildInfoRow('Country:', widget.userData.country),
@@ -125,12 +220,17 @@ class _Page5SummaryState extends State<Page5Summary> {
             _buildInfoRow('City:', widget.userData.city),
             _buildInfoRow('Area:', widget.userData.area),
             _buildInfoRow('Address:', widget.userData.address),
+
             if (widget.userData.role == 'Worker') ...[
               const SizedBox(height: 20),
-              const Text('Experience', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              const Text(
+                'Experience',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 10),
               _buildInfoRow('Experience:', widget.userData.experience),
             ],
+
             const SizedBox(height: 20),
             CheckboxListTile(
               value: termsAccepted,
@@ -162,7 +262,8 @@ class _Page5SummaryState extends State<Page5Summary> {
                   child: ElevatedButton(
                     onPressed: termsAccepted ? _saveToFirebase : null,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: termsAccepted ? Colors.blue : Colors.grey,
+                      backgroundColor:
+                          termsAccepted ? Colors.blue : Colors.grey,
                       foregroundColor: Colors.white,
                     ),
                     child: const Text('Submit'),
