@@ -16,38 +16,34 @@ class Page5Summary extends StatefulWidget {
 }
 
 class _Page5SummaryState extends State<Page5Summary> {
-  bool termsAccepted = false;
   final DatabaseReference _database = FirebaseDatabase.instance.ref();
   String generatedUserId = '';
   bool isUserIdLoading = false;
+  bool termsAccepted = false;
 
   Future<String> _generateUniqueUserId(String role) async {
-    String prefix = role == 'Worker' ? 'WO' : 'JO';
-    String userId;
-    bool isUnique = false;
+    final lastIdRef = _database.child('lastUserId');
+    final lastIdSnapshot = await lastIdRef.get();
 
-    final usersSnapshot = await _database.child("users").get();
-    final existingIds = <String>{};
+    int lastId = 1000;
 
-    if (usersSnapshot.exists) {
-      for (final child in usersSnapshot.children) {
-        final data = child.value as Map;
-        if (data.containsKey("userId")) {
-          existingIds.add(data["userId"]);
+    if (lastIdSnapshot.exists) {
+      try {
+        if (lastIdSnapshot.value is int) {
+          lastId = lastIdSnapshot.value as int;
+        } else if (lastIdSnapshot.value is String) {
+          lastId = int.parse(lastIdSnapshot.value as String);
         }
+      } catch (e) {
+        print("Failed to parse lastUserId: $e");
       }
     }
 
-    do {
-      final random =
-          (1000 + (DateTime.now().millisecondsSinceEpoch % 9000)).toString();
-      userId = '$prefix$random';
-      if (!existingIds.contains(userId)) {
-        isUnique = true;
-      }
-    } while (!isUnique);
+    final newId = lastId + 1;
+    await lastIdRef.set(newId);
 
-    return userId;
+    final prefix = role == 'Worker' ? 'WO' : 'JO';
+    return '$prefix${newId.toString().padLeft(4, '0')}';
   }
 
   Future<String?> _convertImageToBase64(String imagePath) async {
@@ -136,19 +132,11 @@ class _Page5SummaryState extends State<Page5Summary> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        automaticallyImplyLeading: false,
+        title: const Text('Profile Overview'),
         backgroundColor: Colors.blue,
-        title: const Text(
-          'Profile Overview',
-          style: TextStyle(
-            fontSize: 25,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -160,68 +148,41 @@ class _Page5SummaryState extends State<Page5Summary> {
             ),
             const Divider(),
 
-            Center(
-              child: Column(
-                children: [
-                  if (widget.userData.role == 'Worker')
-                    CircleAvatar(
-                      radius: 65,
-                      backgroundColor: Colors.grey[200],
-                      backgroundImage:
-                          widget.userData.profileImage != null
-                              ? FileImage(File(widget.userData.profileImage!))
-                              : null,
-                      child:
-                          widget.userData.profileImage == null
-                              ? const Icon(
-                                Icons.person,
-                                size: 65,
-                                color: Colors.blue,
-                              )
-                              : null,
-                    ),
-                  if (widget.userData.role == 'Worker')
-                    const SizedBox(height: 12),
-
-                  if (generatedUserId.isNotEmpty) ...[
-                    const Text(
-                      'User ID',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.blue, width: 1),
-                      ),
-                      child: Text(
-                        generatedUserId,
-                        style: const TextStyle(
-                          fontSize: 25,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blue,
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
+            if (widget.userData.role == 'Worker')
+              Center(
+                child: CircleAvatar(
+                  radius: 65,
+                  backgroundImage:
+                      widget.userData.profileImage != null
+                          ? FileImage(File(widget.userData.profileImage!))
+                          : null,
+                  child:
+                      widget.userData.profileImage == null
+                          ? const Icon(
+                            Icons.person,
+                            size: 65,
+                            color: Colors.blue,
+                          )
+                          : null,
+                ),
               ),
-            ),
+
+            if (generatedUserId.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              const Center(child: Text('User ID')),
+              Center(
+                child: Text(
+                  generatedUserId,
+                  style: const TextStyle(
+                    fontSize: 25,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue,
+                  ),
+                ),
+              ),
+            ],
 
             const SizedBox(height: 25),
-            const Text(
-              'Personal Information',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 10),
             _buildInfoRow('Name:', widget.userData.name),
             _buildInfoRow('Role:', widget.userData.role),
             _buildInfoRow('Gender:', widget.userData.gender),
@@ -230,13 +191,6 @@ class _Page5SummaryState extends State<Page5Summary> {
               widget.userData.dob?.toLocal().toString().split(' ')[0] ??
                   "Not Set",
             ),
-
-            const SizedBox(height: 20),
-            const Text(
-              'Contact Details',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 10),
             _buildInfoRow('Phone:', widget.userData.phoneNumber),
             _buildInfoRow('Country:', widget.userData.country),
             _buildInfoRow('State:', widget.userData.state),
@@ -245,15 +199,8 @@ class _Page5SummaryState extends State<Page5Summary> {
             _buildInfoRow('Area:', widget.userData.area),
             _buildInfoRow('Address:', widget.userData.address),
 
-            if (widget.userData.role == 'Worker') ...[
-              const SizedBox(height: 20),
-              const Text(
-                'Experience',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 10),
+            if (widget.userData.role == 'Worker')
               _buildInfoRow('Experience:', widget.userData.experience),
-            ],
 
             const SizedBox(height: 20),
             CheckboxListTile(
@@ -265,19 +212,15 @@ class _Page5SummaryState extends State<Page5Summary> {
               },
               controlAffinity: ListTileControlAffinity.leading,
               title: const Text('I accept the Terms & Conditions'),
-              contentPadding: EdgeInsets.zero,
               activeColor: Colors.blue,
             ),
             const SizedBox(height: 10),
+
             Row(
               children: [
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () => Navigator.pop(context),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
-                    ),
                     child: const Text('Back'),
                   ),
                 ),
@@ -285,19 +228,18 @@ class _Page5SummaryState extends State<Page5Summary> {
                 Expanded(
                   child: ElevatedButton(
                     onPressed: isUserIdLoading ? null : _handleSubmit,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor:
-                          (termsAccepted && !isUserIdLoading)
-                              ? Colors.blue
-                              : Colors.grey,
-                      foregroundColor: Colors.white,
-                    ),
                     child:
                         isUserIdLoading
                             ? const CircularProgressIndicator(
                               color: Colors.white,
                             )
                             : const Text('Submit'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor:
+                          (termsAccepted && !isUserIdLoading)
+                              ? Colors.blue
+                              : Colors.grey,
+                    ),
                   ),
                 ),
               ],
@@ -310,18 +252,11 @@ class _Page5SummaryState extends State<Page5Summary> {
 
   Widget _buildInfoRow(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
+      padding: const EdgeInsets.only(top: 8),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
-          Expanded(
-            child: Text(
-              value.isNotEmpty ? value : 'Not provided',
-              textAlign: TextAlign.end,
-              softWrap: true,
-            ),
-          ),
+          Text('$label ', style: const TextStyle(fontWeight: FontWeight.bold)),
+          Expanded(child: Text(value.isNotEmpty ? value : 'Not provided')),
         ],
       ),
     );
