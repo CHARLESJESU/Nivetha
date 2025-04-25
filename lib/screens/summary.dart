@@ -19,23 +19,7 @@ class _Page5SummaryState extends State<Page5Summary> {
   bool termsAccepted = false;
   final DatabaseReference _database = FirebaseDatabase.instance.ref();
   String generatedUserId = '';
-  bool isUserIdLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _initializeUserId();
-  }
-
-  void _initializeUserId() async {
-    if (generatedUserId.isEmpty) {
-      final id = await _generateUniqueUserId(widget.userData.role);
-      setState(() {
-        generatedUserId = id;
-        isUserIdLoading = false;
-      });
-    }
-  }
+  bool isUserIdLoading = false;
 
   Future<String> _generateUniqueUserId(String role) async {
     String prefix = role == 'Worker' ? 'WO' : 'JO';
@@ -75,6 +59,22 @@ class _Page5SummaryState extends State<Page5Summary> {
       print("Image conversion failed: $e");
       return null;
     }
+  }
+
+  Future<void> _handleSubmit() async {
+    if (!termsAccepted) return;
+
+    setState(() {
+      isUserIdLoading = true;
+    });
+
+    generatedUserId = await _generateUniqueUserId(widget.userData.role);
+
+    setState(() {
+      isUserIdLoading = false;
+    });
+
+    _saveToFirebase();
   }
 
   void _saveToFirebase() async {
@@ -196,7 +196,7 @@ class _Page5SummaryState extends State<Page5Summary> {
                             : Text(
                               generatedUserId.isNotEmpty
                                   ? generatedUserId
-                                  : 'Generating...',
+                                  : 'Click Submit to generate',
                               style: const TextStyle(
                                 fontSize: 25,
                                 fontWeight: FontWeight.bold,
@@ -278,8 +278,8 @@ class _Page5SummaryState extends State<Page5Summary> {
                 Expanded(
                   child: ElevatedButton(
                     onPressed:
-                        (termsAccepted && !isUserIdLoading)
-                            ? _saveToFirebase
+                        termsAccepted && !isUserIdLoading
+                            ? _handleSubmit
                             : null,
                     style: ElevatedButton.styleFrom(
                       backgroundColor:
