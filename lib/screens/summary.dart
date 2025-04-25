@@ -16,33 +16,39 @@ class Page5Summary extends StatefulWidget {
 }
 
 class _Page5SummaryState extends State<Page5Summary> {
+  bool termsAccepted = false;
   final DatabaseReference _database = FirebaseDatabase.instance.ref();
   String generatedUserId = '';
-  bool isUserIdLoading = false;
-  bool termsAccepted = false;
+  bool isUserIdLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeUserId();
+  }
+
+  void _initializeUserId() async {
+    if (generatedUserId.isEmpty) {
+      final id = await _generateUniqueUserId(widget.userData.role);
+      setState(() {
+        generatedUserId = id;
+        isUserIdLoading = false;
+      });
+    }
+  }
 
   Future<String> _generateUniqueUserId(String role) async {
-    final lastIdRef = _database.child('lastUserId');
-    final lastIdSnapshot = await lastIdRef.get();
+    String prefix = role == 'Worker' ? 'WO' : 'JO';
+    final lastIdSnapshot = await _database.child("lastUserId").get();
 
     int lastId = 1000;
-
     if (lastIdSnapshot.exists) {
-      try {
-        if (lastIdSnapshot.value is int) {
-          lastId = lastIdSnapshot.value as int;
-        } else if (lastIdSnapshot.value is String) {
-          lastId = int.parse(lastIdSnapshot.value as String);
-        }
-      } catch (e) {
-        print("Failed to parse lastUserId: $e");
-      }
+      lastId = int.tryParse(lastIdSnapshot.value.toString()) ?? 1000;
     }
 
-    final newId = lastId + 1;
-    await lastIdRef.set(newId);
+    int newId = lastId + 1;
+    await _database.child("lastUserId").set(newId.toString());
 
-    final prefix = role == 'Worker' ? 'WO' : 'JO';
     return '$prefix${newId.toString().padLeft(4, '0')}';
   }
 
@@ -57,56 +63,36 @@ class _Page5SummaryState extends State<Page5Summary> {
     }
   }
 
-  Future<void> _handleSubmit() async {
-    if (!termsAccepted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please accept Terms & Conditions')),
-      );
-      return;
+  void _saveToFirebase() async {
+    if (!termsAccepted || isUserIdLoading) return;
+
+    String? base64Image;
+    if (widget.userData.role == 'Worker' &&
+        widget.userData.profileImage != null &&
+        widget.userData.profileImage!.isNotEmpty) {
+      base64Image = await _convertImageToBase64(widget.userData.profileImage!);
     }
 
+    Map<String, dynamic> userDataMap = {
+      "userId": generatedUserId,
+      "name": widget.userData.name,
+      "role": widget.userData.role,
+      "gender": widget.userData.gender,
+      "dob": widget.userData.dob?.toIso8601String() ?? "Not Set",
+      "phone": widget.userData.phoneNumber,
+      "country": widget.userData.country,
+      "state": widget.userData.state,
+      "district": widget.userData.district,
+      "city": widget.userData.city,
+      "area": widget.userData.area,
+      "address": widget.userData.address,
+      "experience":
+          widget.userData.role == 'Worker' ? widget.userData.experience : "N/A",
+      "profileImageBase64": base64Image ?? "No Image",
+    };
+
     try {
-      setState(() {
-        isUserIdLoading = true;
-      });
-
-      generatedUserId = await _generateUniqueUserId(widget.userData.role);
-
-      String? base64Image;
-      if (widget.userData.role == 'Worker' &&
-          widget.userData.profileImage != null &&
-          widget.userData.profileImage!.isNotEmpty) {
-        base64Image = await _convertImageToBase64(
-          widget.userData.profileImage!,
-        );
-      }
-
-      Map<String, dynamic> userDataMap = {
-        "userId": generatedUserId,
-        "name": widget.userData.name,
-        "role": widget.userData.role,
-        "gender": widget.userData.gender,
-        "dob": widget.userData.dob?.toIso8601String() ?? "Not Set",
-        "phone": widget.userData.phoneNumber,
-        "country": widget.userData.country,
-        "state": widget.userData.state,
-        "district": widget.userData.district,
-        "city": widget.userData.city,
-        "area": widget.userData.area,
-        "address": widget.userData.address,
-        "experience":
-            widget.userData.role == 'Worker'
-                ? widget.userData.experience
-                : "N/A",
-        "profileImageBase64": base64Image ?? "No Image",
-      };
-
       await _database.child("users").push().set(userDataMap);
-
-      setState(() {
-        isUserIdLoading = false;
-      });
-
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -117,14 +103,10 @@ class _Page5SummaryState extends State<Page5Summary> {
               ),
         ),
       );
-    } catch (e) {
-      setState(() {
-        isUserIdLoading = false;
-      });
-      print("Submit Error: $e");
+    } catch (error) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Submit failed: $e')));
+      ).showSnackBar(SnackBar(content: Text('Failed to save data: $error')));
     }
   }
 
@@ -132,11 +114,19 @@ class _Page5SummaryState extends State<Page5Summary> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Profile Overview'),
+        automaticallyImplyLeading: false,
         backgroundColor: Colors.blue,
+        title: const Text(
+          'Profile Overview',
+          style: TextStyle(
+            fontSize: 25,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -148,41 +138,82 @@ class _Page5SummaryState extends State<Page5Summary> {
             ),
             const Divider(),
 
-            if (widget.userData.role == 'Worker')
-              Center(
-                child: CircleAvatar(
-                  radius: 65,
-                  backgroundImage:
-                      widget.userData.profileImage != null
-                          ? FileImage(File(widget.userData.profileImage!))
-                          : null,
-                  child:
-                      widget.userData.profileImage == null
-                          ? const Icon(
-                            Icons.person,
-                            size: 65,
-                            color: Colors.blue,
-                          )
-                          : null,
-                ),
-              ),
+            Center(
+              child: Column(
+                children: [
+                  if (widget.userData.role == 'Worker')
+                    CircleAvatar(
+                      radius: 65,
+                      backgroundColor: Colors.grey[200],
+                      backgroundImage:
+                          widget.userData.profileImage != null
+                              ? FileImage(File(widget.userData.profileImage!))
+                              : null,
+                      child:
+                          widget.userData.profileImage == null
+                              ? const Icon(
+                                Icons.person,
+                                size: 65,
+                                color: Colors.blue,
+                              )
+                              : null,
+                    ),
+                  if (widget.userData.role == 'Worker')
+                    const SizedBox(height: 12),
 
-            if (generatedUserId.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              const Center(child: Text('User ID')),
-              Center(
-                child: Text(
-                  generatedUserId,
-                  style: const TextStyle(
-                    fontSize: 25,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue,
+                  const Text(
+                    'User ID',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
                   ),
-                ),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.blue, width: 1),
+                    ),
+                    child:
+                        isUserIdLoading
+                            ? const CircularProgressIndicator()
+                            : Column(
+                              children: [
+                                Text(
+                                  generatedUserId.isNotEmpty
+                                      ? generatedUserId
+                                      : 'Generating...',
+                                  style: const TextStyle(
+                                    fontSize: 25,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.blue,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 8),
+                                const Text(
+                                  'Your User ID has been generated successfully.',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.green,
+                                  ),
+                                ),
+                              ],
+                            ),
+                  ),
+                ],
               ),
-            ],
+            ),
 
             const SizedBox(height: 25),
+            const Text(
+              'Personal Information',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 10),
             _buildInfoRow('Name:', widget.userData.name),
             _buildInfoRow('Role:', widget.userData.role),
             _buildInfoRow('Gender:', widget.userData.gender),
@@ -191,6 +222,13 @@ class _Page5SummaryState extends State<Page5Summary> {
               widget.userData.dob?.toLocal().toString().split(' ')[0] ??
                   "Not Set",
             ),
+
+            const SizedBox(height: 20),
+            const Text(
+              'Contact Details',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 10),
             _buildInfoRow('Phone:', widget.userData.phoneNumber),
             _buildInfoRow('Country:', widget.userData.country),
             _buildInfoRow('State:', widget.userData.state),
@@ -199,8 +237,15 @@ class _Page5SummaryState extends State<Page5Summary> {
             _buildInfoRow('Area:', widget.userData.area),
             _buildInfoRow('Address:', widget.userData.address),
 
-            if (widget.userData.role == 'Worker')
+            if (widget.userData.role == 'Worker') ...[
+              const SizedBox(height: 20),
+              const Text(
+                'Experience',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 10),
               _buildInfoRow('Experience:', widget.userData.experience),
+            ],
 
             const SizedBox(height: 20),
             CheckboxListTile(
@@ -212,34 +257,37 @@ class _Page5SummaryState extends State<Page5Summary> {
               },
               controlAffinity: ListTileControlAffinity.leading,
               title: const Text('I accept the Terms & Conditions'),
+              contentPadding: EdgeInsets.zero,
               activeColor: Colors.blue,
             ),
             const SizedBox(height: 10),
-
             Row(
               children: [
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                    ),
                     child: const Text('Back'),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: isUserIdLoading ? null : _handleSubmit,
-                    child:
-                        isUserIdLoading
-                            ? const CircularProgressIndicator(
-                              color: Colors.white,
-                            )
-                            : const Text('Submit'),
+                    onPressed:
+                        (termsAccepted && !isUserIdLoading)
+                            ? _saveToFirebase
+                            : null,
                     style: ElevatedButton.styleFrom(
                       backgroundColor:
                           (termsAccepted && !isUserIdLoading)
                               ? Colors.blue
                               : Colors.grey,
+                      foregroundColor: Colors.white,
                     ),
+                    child: const Text('Submit'),
                   ),
                 ),
               ],
@@ -252,11 +300,18 @@ class _Page5SummaryState extends State<Page5Summary> {
 
   Widget _buildInfoRow(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.only(bottom: 8.0),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text('$label ', style: const TextStyle(fontWeight: FontWeight.bold)),
-          Expanded(child: Text(value.isNotEmpty ? value : 'Not provided')),
+          Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+          Expanded(
+            child: Text(
+              value.isNotEmpty ? value : 'Not provided',
+              textAlign: TextAlign.end,
+              softWrap: true,
+            ),
+          ),
         ],
       ),
     );
