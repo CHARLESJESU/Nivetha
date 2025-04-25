@@ -179,29 +179,16 @@ class _Page5SummaryState extends State<Page5Summary> {
                     child:
                         isUserIdLoading
                             ? const CircularProgressIndicator()
-                            : Column(
-                              children: [
-                                Text(
-                                  generatedUserId.isNotEmpty
-                                      ? generatedUserId
-                                      : 'Generating...',
-                                  style: const TextStyle(
-                                    fontSize: 25,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.blue,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                                const SizedBox(height: 8),
-                                const Text(
-                                  'Your User ID has been generated successfully.',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w500,
-                                    color: Colors.green,
-                                  ),
-                                ),
-                              ],
+                            : Text(
+                              generatedUserId.isNotEmpty
+                                  ? generatedUserId
+                                  : 'Generating...',
+                              style: const TextStyle(
+                                fontSize: 25,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blue,
+                              ),
+                              textAlign: TextAlign.center,
                             ),
                   ),
                 ],
