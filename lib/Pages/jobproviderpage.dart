@@ -27,37 +27,44 @@ class _HomeScreenState extends State<Jobproviderpage> {
     userData = widget.userData;
     _initializePreferences();
   }
+
   void _initializePreferences() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setBool('isLoggedIn', true);
     await prefs.setBool('isworker', false);
   }
+
   Future<void> _pickImage() async {
     final picker = ImagePicker();
     final XFile? image = await showModalBottomSheet<XFile?>(
       context: context,
-      builder: (context) => SafeArea(
-        child: Wrap(
-          children: [
-            ListTile(
-              leading: Icon(Icons.camera_alt),
-              title: Text('Take Photo'),
-              onTap: () async {
-                final picked = await picker.pickImage(source: ImageSource.camera);
-                Navigator.pop(context, picked);
-              },
+      builder:
+          (context) => SafeArea(
+            child: Wrap(
+              children: [
+                ListTile(
+                  leading: Icon(Icons.camera_alt),
+                  title: Text('Take Photo'),
+                  onTap: () async {
+                    final picked = await picker.pickImage(
+                      source: ImageSource.camera,
+                    );
+                    Navigator.pop(context, picked);
+                  },
+                ),
+                ListTile(
+                  leading: Icon(Icons.photo_library),
+                  title: Text('Choose from Gallery'),
+                  onTap: () async {
+                    final picked = await picker.pickImage(
+                      source: ImageSource.gallery,
+                    );
+                    Navigator.pop(context, picked);
+                  },
+                ),
+              ],
             ),
-            ListTile(
-              leading: Icon(Icons.photo_library),
-              title: Text('Choose from Gallery'),
-              onTap: () async {
-                final picked = await picker.pickImage(source: ImageSource.gallery);
-                Navigator.pop(context, picked);
-              },
-            ),
-          ],
-        ),
-      ),
+          ),
     );
 
     if (image != null) {
@@ -69,7 +76,8 @@ class _HomeScreenState extends State<Jobproviderpage> {
 
   Future<bool> _onWillPop() async {
     DateTime now = DateTime.now();
-    if (_lastBackPressed == null || now.difference(_lastBackPressed!) > Duration(seconds: 2)) {
+    if (_lastBackPressed == null ||
+        now.difference(_lastBackPressed!) > Duration(seconds: 2)) {
       _lastBackPressed = now;
       _backPressCounter = 1;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -81,20 +89,21 @@ class _HomeScreenState extends State<Jobproviderpage> {
       if (_backPressCounter >= 2) {
         final shouldExit = await showDialog<bool>(
           context: context,
-          builder: (context) => AlertDialog(
-            title: Text('Exit App'),
-            content: Text('Are you sure you want to exit?'),
-            actions: [
-              TextButton(
-                child: Text('Cancel'),
-                onPressed: () => Navigator.of(context).pop(false),
+          builder:
+              (context) => AlertDialog(
+                title: Text('Exit App'),
+                content: Text('Are you sure you want to exit?'),
+                actions: [
+                  TextButton(
+                    child: Text('Cancel'),
+                    onPressed: () => Navigator.of(context).pop(false),
+                  ),
+                  TextButton(
+                    child: Text('Exit'),
+                    onPressed: () => Navigator.of(context).pop(true),
+                  ),
+                ],
               ),
-              TextButton(
-                child: Text('Exit'),
-                onPressed: () => Navigator.of(context).pop(true),
-              ),
-            ],
-          ),
         );
         if (shouldExit == true) {
           SystemNavigator.pop(); // Exit app
@@ -143,11 +152,7 @@ class _HomeScreenState extends State<Jobproviderpage> {
                             shape: BoxShape.circle,
                           ),
                           padding: EdgeInsets.all(3),
-                          child: Icon(
-                            Icons.edit,
-                            size: 18,
-                            color: Colors.blue,
-                          ),
+                          child: Icon(Icons.edit, size: 18, color: Colors.blue),
                         ),
                       ),
                     ),
@@ -184,9 +189,9 @@ class _HomeScreenState extends State<Jobproviderpage> {
                   );
 
                   if (shouldLogout == true) {
-                    SharedPreferences prefs = await SharedPreferences.getInstance();
+                    SharedPreferences prefs =
+                        await SharedPreferences.getInstance();
                     await prefs.setBool('isLoggedIn', false);
-
 
                     Navigator.pushReplacement(
                       context,
@@ -200,11 +205,17 @@ class _HomeScreenState extends State<Jobproviderpage> {
               Divider(),
               Padding(
                 padding: const EdgeInsets.all(16.0),
-                child: Text('Profile Details', style: TextStyle(fontWeight: FontWeight.bold)),
+                child: Text(
+                  'Profile Details',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
               ),
               _buildProfileDetail('Role', userData.role),
               _buildProfileDetail('Gender', userData.gender),
-              _buildProfileDetail('DOB', userData.dob?.toLocal().toString().split(' ')[0] ?? 'Not Set'),
+              _buildProfileDetail(
+                'DOB',
+                userData.dob?.toLocal().toString().split(' ')[0] ?? 'Not Set',
+              ),
               _buildProfileDetail('Phone', userData.phoneNumber),
               _buildProfileDetail('Country', userData.country),
               _buildProfileDetail('State', userData.state),
@@ -218,7 +229,7 @@ class _HomeScreenState extends State<Jobproviderpage> {
           ),
         ),
         body: Center(
-          child: Text('Home Screen Content Here', style: TextStyle(fontSize: 18)),
+          child: Text('Home Screen', style: TextStyle(fontSize: 18)),
         ),
       ),
     );
@@ -253,11 +264,7 @@ class _HomeScreenState extends State<Jobproviderpage> {
     return CircleAvatar(
       radius: radius,
       backgroundColor: Colors.grey[300],
-      child: Icon(
-        Icons.account_circle,
-        size: radius * 2,
-        color: Colors.white,
-      ),
+      child: Icon(Icons.account_circle, size: radius * 2, color: Colors.white),
     );
   }
 }
