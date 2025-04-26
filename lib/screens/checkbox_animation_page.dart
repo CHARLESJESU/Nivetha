@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:nivetha123/Pages/workerpage.dart';
 import 'package:nivetha123/Pages/jobproviderpage.dart';
+import 'package:nivetha123/Pages/workerpage.dart';
 import 'package:nivetha123/screens/user_data.dart';
 
 class CheckboxAnimationPage extends StatefulWidget {
@@ -23,33 +23,38 @@ class _CheckboxAnimationPageState extends State<CheckboxAnimationPage> {
   void initState() {
     super.initState();
 
+    // Run the animation and navigate only if registration was successful
     if (widget.success) {
-      Future.delayed(const Duration(milliseconds: 300), () {
-        setState(() {
-          isChecked = true;
-        });
+      _runAnimationAndNavigate();
+    }
+  }
 
-        Future.delayed(const Duration(seconds: 1), () async {
-          if (widget.userData != null) {
-            final prefs = await SharedPreferences.getInstance();
-            await prefs.setString(
-              'userData',
-              jsonEncode(widget.userData!.toJson()),
-            );
+  // A helper method to handle animation and navigation logic
+  Future<void> _runAnimationAndNavigate() async {
+    // Trigger the checkbox animation
+    setState(() {
+      isChecked = true;
+    });
 
-            // Navigate based on role
-            Widget nextPage =
-                widget.userData!.role == 'Worker'
-                    ? Workerpage(userData: widget.userData!)
-                    : Jobproviderpage(userData: widget.userData!);
+    // Wait for the animation to complete before navigating
+    await Future.delayed(const Duration(seconds: 1));
 
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (_) => nextPage),
-            );
-          }
-        });
-      });
+    if (widget.userData != null) {
+      final prefs = await SharedPreferences.getInstance();
+      // Store user data as a JSON string in shared preferences
+      await prefs.setString('userData', jsonEncode(widget.userData!.toJson()));
+
+      // Navigate based on user role (Worker or Job Provider)
+      Widget nextPage =
+          widget.userData!.role == 'Worker'
+              ? Workerpage(userData: widget.userData!)
+              : Jobproviderpage(userData: widget.userData!);
+
+      // Replace the current screen with the appropriate page
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => nextPage),
+      );
     }
   }
 
@@ -61,6 +66,7 @@ class _CheckboxAnimationPageState extends State<CheckboxAnimationPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            // Animated container for checkbox effect
             AnimatedContainer(
               duration: const Duration(milliseconds: 500),
               width: isChecked ? 150 : 70,
@@ -75,6 +81,7 @@ class _CheckboxAnimationPageState extends State<CheckboxAnimationPage> {
                       : const SizedBox.shrink(),
             ),
             const SizedBox(height: 30),
+            // Display appropriate success message
             Text(
               widget.success
                   ? "Registration Successful!"
@@ -83,6 +90,7 @@ class _CheckboxAnimationPageState extends State<CheckboxAnimationPage> {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 40),
+            // If registration wasn't successful, show a "Go Back" button
             if (!widget.success)
               ElevatedButton(
                 onPressed: () => Navigator.pop(context),

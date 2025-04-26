@@ -4,7 +4,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:nivetha123/screens/user_data.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
 import '../login/Login.dart';
 
 class Workerpage extends StatefulWidget {
@@ -13,10 +12,10 @@ class Workerpage extends StatefulWidget {
   const Workerpage({Key? key, required this.userData}) : super(key: key);
 
   @override
-  _HomeScreenState createState() => _HomeScreenState();
+  _WorkerpageState createState() => _WorkerpageState();
 }
 
-class _HomeScreenState extends State<Workerpage> {
+class _WorkerpageState extends State<Workerpage> {
   late UserData userData;
   int _backPressCounter = 0;
   DateTime? _lastBackPressed;
@@ -38,33 +37,34 @@ class _HomeScreenState extends State<Workerpage> {
     final picker = ImagePicker();
     final XFile? image = await showModalBottomSheet<XFile?>(
       context: context,
-      builder:
-          (context) => SafeArea(
-            child: Wrap(
-              children: [
-                ListTile(
-                  leading: Icon(Icons.camera_alt),
-                  title: Text('Take Photo'),
-                  onTap: () async {
-                    final picked = await picker.pickImage(
-                      source: ImageSource.camera,
-                    );
-                    Navigator.pop(context, picked);
-                  },
-                ),
-                ListTile(
-                  leading: Icon(Icons.photo_library),
-                  title: Text('Choose from Gallery'),
-                  onTap: () async {
-                    final picked = await picker.pickImage(
-                      source: ImageSource.gallery,
-                    );
-                    Navigator.pop(context, picked);
-                  },
-                ),
-              ],
-            ),
+      builder: (context) {
+        return SafeArea(
+          child: Wrap(
+            children: [
+              ListTile(
+                leading: Icon(Icons.camera_alt),
+                title: Text('Take Photo'),
+                onTap: () async {
+                  final picked = await picker.pickImage(
+                    source: ImageSource.camera,
+                  );
+                  Navigator.pop(context, picked);
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.photo_library),
+                title: Text('Choose from Gallery'),
+                onTap: () async {
+                  final picked = await picker.pickImage(
+                    source: ImageSource.gallery,
+                  );
+                  Navigator.pop(context, picked);
+                },
+              ),
+            ],
           ),
+        );
+      },
     );
 
     if (image != null) {
@@ -229,10 +229,7 @@ class _HomeScreenState extends State<Workerpage> {
           ),
         ),
         body: Center(
-          child: Text(
-            'Home Screen Content Here',
-            style: TextStyle(fontSize: 18),
-          ),
+          child: Text('Home Screen', style: TextStyle(fontSize: 18)),
         ),
       ),
     );
@@ -253,21 +250,13 @@ class _HomeScreenState extends State<Workerpage> {
       );
     }
 
-    if (userData.role == 'Job Provider') {
-      return CircleAvatar(
-        backgroundColor: Colors.grey[300],
-        radius: radius,
-        child: Text(
-          userData.name.isNotEmpty ? userData.name[0].toUpperCase() : '?',
-          style: TextStyle(fontSize: radius, color: Colors.blue),
-        ),
-      );
-    }
-
     return CircleAvatar(
       radius: radius,
       backgroundColor: Colors.grey[300],
-      child: Icon(Icons.account_circle, size: radius * 2, color: Colors.white),
+      child: Text(
+        userData.name.isNotEmpty ? userData.name[0].toUpperCase() : '?',
+        style: TextStyle(fontSize: radius, color: Colors.blue),
+      ),
     );
   }
 }
