@@ -210,6 +210,7 @@ class _WorkerpageState extends State<Workerpage> {
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
+              _buildProfileDetail('User Id', userData.userId),
               _buildProfileDetail('Role', userData.role),
               _buildProfileDetail('Gender', userData.gender),
               _buildProfileDetail(

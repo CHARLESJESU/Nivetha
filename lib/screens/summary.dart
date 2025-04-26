@@ -78,8 +78,8 @@ class _Page5SummaryState extends State<Page5Summary> {
       base64Image = await _convertImageToBase64(widget.userData.profileImage!);
     }
 
-    Map<String, dynamic> userDataMap = {
-      "userId": generatedUserId,
+    Map<String, dynamic> personalInfo = {
+      "userId": widget.userData.userId = generatedUserId,
       "name": widget.userData.name,
       "role": widget.userData.role,
       "gender": widget.userData.gender,
@@ -91,6 +91,10 @@ class _Page5SummaryState extends State<Page5Summary> {
       "city": widget.userData.city,
       "area": widget.userData.area,
       "address": widget.userData.address,
+    };
+
+    Map<String, dynamic> userDataMap = {
+      "personalInformation": personalInfo,
       "experience":
           widget.userData.role == 'Worker' ? widget.userData.experience : "N/A",
       "profileImageBase64": base64Image ?? "No Image",
@@ -236,6 +240,7 @@ class _Page5SummaryState extends State<Page5Summary> {
                       ),
                     ),
                     const SizedBox(height: 10),
+                    _buildInfoRow('User Id:', generatedUserId),
                     _buildInfoRow('Name:', widget.userData.name),
                     _buildInfoRow('Role:', widget.userData.role),
                     _buildInfoRow('Gender:', widget.userData.gender),

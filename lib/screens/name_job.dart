@@ -119,13 +119,7 @@ class _Page1NameRoleState extends State<Page1NameRole> {
 
                     if (selectedRole ==
                         null) // Show error message if no role selected
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8.0),
-                        child: Text(
-                          'Please select a role',
-                          style: TextStyle(color: Colors.red, fontSize: 14),
-                        ),
-                      ),
+                      Padding(padding: const EdgeInsets.only(top: 8.0)),
                   ],
                 ),
               ),
