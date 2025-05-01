@@ -8,7 +8,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../login/Login.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:get/get.dart';
 
 class Workerpage extends StatefulWidget {
   final UserData userData;
@@ -26,6 +25,9 @@ class _WorkerpageState extends State<Workerpage> {
 
   List<Post> posts = [];
   bool isLoading = true;
+
+  // Store whether the user has already applied for a specific job
+  Map<String, bool> appliedJobs = {};
 
   @override
   void initState() {
@@ -163,7 +165,7 @@ class _WorkerpageState extends State<Workerpage> {
     }
   }
 
-  Future<void> _applyForJob(String jobProviderUserId) async {
+  Future<void> _applyForJob(String jobProviderUserId, String postId) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -199,6 +201,11 @@ class _WorkerpageState extends State<Workerpage> {
           .child(workerUserId); // The worker's userId from userData
 
       await applicationRef.set(workerDetails);
+
+      // Update the appliedJobs map
+      setState(() {
+        appliedJobs[postId] = true;
+      });
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Successfully applied to the job!')),
@@ -283,7 +290,12 @@ class _WorkerpageState extends State<Workerpage> {
                     SharedPreferences prefs =
                         await SharedPreferences.getInstance();
                     await prefs.setBool('isLoggedIn', false);
-                    Get.offAll(() => const LoginScreen());
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const LoginScreen(),
+                      ),
+                    );
                   }
                 },
               ),
@@ -321,6 +333,7 @@ class _WorkerpageState extends State<Workerpage> {
                   itemCount: posts.length,
                   itemBuilder: (context, index) {
                     final post = posts[index];
+                    final isApplied = appliedJobs[post.postId] ?? false;
                     return Card(
                       margin: EdgeInsets.all(8.0),
                       child: Padding(
@@ -336,9 +349,13 @@ class _WorkerpageState extends State<Workerpage> {
                             if (post.imageBase64.isNotEmpty)
                               GestureDetector(
                                 onTap: () {
-                                  Get.to(
-                                    () => FullImagePage(
-                                      imageBase64: post.imageBase64,
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder:
+                                          (_) => FullImagePage(
+                                            imageBase64: post.imageBase64,
+                                          ),
                                     ),
                                   );
                                 },
@@ -354,10 +371,18 @@ class _WorkerpageState extends State<Workerpage> {
                             Align(
                               alignment: Alignment.centerRight,
                               child: ElevatedButton(
-                                onPressed: () {
-                                  _applyForJob(post.userId);
-                                },
-                                child: Text("Apply Now"),
+                                onPressed:
+                                    isApplied
+                                        ? null
+                                        : () {
+                                          _applyForJob(
+                                            post.userId,
+                                            post.postId,
+                                          );
+                                        },
+                                child: Text(
+                                  isApplied ? "Applied" : "Apply Now",
+                                ),
                               ),
                             ),
                           ],
