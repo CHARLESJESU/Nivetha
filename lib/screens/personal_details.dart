@@ -19,7 +19,7 @@ class _Page2PersonalDetailsState extends State<Page2PersonalDetails> {
   void _validateAndProceed() {
     if (widget.userData.gender == null || selectedDate == null) {
       setState(() {
-        errorMessage = "Please select gender and date of birth.";
+        errorMessage = 'Please select gender and date of birth';
       });
       return;
     }
@@ -41,13 +41,15 @@ class _Page2PersonalDetailsState extends State<Page2PersonalDetails> {
       }
     }
 
-    // Proceed to next page
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => Page3ContactDetails(userData: widget.userData),
-      ),
-    );
+    // ✅ Delay navigation so user can see the message
+    Future.delayed(Duration(seconds: 0), () {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => Page3ContactDetails(userData: widget.userData),
+        ),
+      );
+    });
   }
 
   @override
@@ -79,7 +81,7 @@ class _Page2PersonalDetailsState extends State<Page2PersonalDetails> {
 
                   SizedBox(height: 30),
 
-                  // Gender Selection with Radio Buttons
+                  // Gender Selection
                   Text(
                     'Select Gender',
                     style: TextStyle(
@@ -101,7 +103,6 @@ class _Page2PersonalDetailsState extends State<Page2PersonalDetails> {
                                 widget.userData.gender = value!;
                                 errorMessage = null;
                               });
-                              _validateAndProceed(); // Auto navigate after selection
                             },
                             activeColor: Colors.blue,
                           );

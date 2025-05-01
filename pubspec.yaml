@@ -48,7 +48,12 @@ dependencies:
   firebase_database: ^11.3.4
   firebase_storage: ^12.4.1
   flutter_animate: ^4.2.0
+  lottie: ^3.3.1
+  photo_view: ^0.14.0
 
+  google_sign_in: ^6.2.2
+  uuid: ^4.0.0
+  path_provider: ^2.1.2
 dev_dependencies:
   flutter_test:
     sdk: flutter

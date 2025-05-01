@@ -7,8 +7,6 @@ import 'package:nivetha123/Splashscreen/splashscreen.dart';
 
 import 'login/Login.dart';
 
-
-
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -25,9 +23,9 @@ Future<void> main() async {
     await Firebase.initializeApp();
   }
 
-
   runApp(const Myapp());
 }
+
 class Myapp extends StatefulWidget {
   const Myapp({super.key});
 

@@ -1,4 +1,5 @@
 class UserData {
+  String userId = ''; // 🆕 Added userId
   String name = '';
   String role = ''; // Worker or Job Provider
   String gender = '';
@@ -13,8 +14,9 @@ class UserData {
   String experience = '';
   String profileImage = '';
 
-  // Constructor
+  // ✅ Constructor
   UserData({
+    this.userId = '',
     this.name = '',
     this.role = '',
     this.gender = '',
@@ -29,9 +31,11 @@ class UserData {
     this.experience = '',
     this.profileImage = '',
   });
-// ✅ TO JSON
+
+  // ✅ TO JSON
   Map<String, dynamic> toJson() {
     return {
+      'userId': userId, // 🆕 added
       'name': name,
       'role': role,
       'gender': gender,
@@ -51,6 +55,7 @@ class UserData {
   // ✅ FROM JSON
   factory UserData.fromJson(Map<String, dynamic> json) {
     return UserData(
+      userId: json['userId'] ?? '', // 🆕 added
       name: json['name'] ?? '',
       role: json['role'] ?? '',
       gender: json['gender'] ?? '',
@@ -67,13 +72,16 @@ class UserData {
     );
   }
 
+  // ✅ (Optional) Setters you had
   set contactImage(String contactImage) {}
 
   set areaAddress(String areaAddress) {}
 
-  // Format user details for UI display
+  // ✅ Format user details for UI display
   Map<String, String> getDisplayData() {
     return {
+      'User ID':
+          userId.isNotEmpty ? userId : 'Not provided', // 🆕 display userId
       'Name': name.isNotEmpty ? name : 'Not provided',
       'Role': role.isNotEmpty ? role : 'Not provided',
       'Gender': gender.isNotEmpty ? gender : 'Not provided',
@@ -90,8 +98,9 @@ class UserData {
     };
   }
 
-  // Reset method
+  // ✅ Reset method
   void reset() {
+    userId = ''; // 🆕 reset userId too
     name = '';
     role = '';
     gender = '';
