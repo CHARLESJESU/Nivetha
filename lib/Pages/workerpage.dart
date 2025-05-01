@@ -24,8 +24,10 @@ class _WorkerpageState extends State<Workerpage> {
   DateTime? _lastBackPressed;
 
   List<Post> posts = [];
-  Set<String> appliedJobIds = {};
   bool isLoading = true;
+
+  // Store whether the user has already applied for a specific job
+  Map<String, bool> appliedJobs = {};
 
   @override
   void initState() {
@@ -33,38 +35,12 @@ class _WorkerpageState extends State<Workerpage> {
     userData = widget.userData;
     _initializePreferences();
     _loadPosts();
-    _loadAppliedJobs();
   }
 
   void _initializePreferences() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setBool('isLoggedIn', true);
     await prefs.setBool('isworker', true);
-  }
-
-  Future<void> _loadAppliedJobs() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    final ref = FirebaseDatabase.instance.ref('applications');
-    final snapshot = await ref.get();
-
-    if (snapshot.exists) {
-      final data = snapshot.value as Map<dynamic, dynamic>;
-      Set<String> jobIds = {};
-      data.forEach((jobProviderId, workersMap) {
-        if (workersMap is Map<dynamic, dynamic>) {
-          workersMap.forEach((workerId, details) {
-            if (workerId == userData.userId) {
-              jobIds.add(jobProviderId);
-            }
-          });
-        }
-      });
-      setState(() {
-        appliedJobIds = jobIds;
-      });
-    }
   }
 
   Future<void> _loadPosts() async {
@@ -189,7 +165,7 @@ class _WorkerpageState extends State<Workerpage> {
     }
   }
 
-  Future<void> _applyForJob(String jobProviderUserId) async {
+  Future<void> _applyForJob(String jobProviderUserId, String postId) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -199,7 +175,8 @@ class _WorkerpageState extends State<Workerpage> {
     }
 
     try {
-      final workerUserId = userData.userId;
+      final workerUserId =
+          userData.userId; // Using userData.userId instead of Firebase UID
 
       final workerDetails = {
         'workerUserId': workerUserId,
@@ -217,15 +194,17 @@ class _WorkerpageState extends State<Workerpage> {
         'address': userData.address,
       };
 
+      // Save worker details using the userData.userId as the worker's unique ID
       final applicationRef = FirebaseDatabase.instance
           .ref('applications')
-          .child(jobProviderUserId)
-          .child(workerUserId);
+          .child(jobProviderUserId) // The job provider's user ID
+          .child(workerUserId); // The worker's userId from userData
 
       await applicationRef.set(workerDetails);
 
+      // Update the appliedJobs map
       setState(() {
-        appliedJobIds.add(jobProviderUserId);
+        appliedJobs[postId] = true;
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -249,20 +228,108 @@ class _WorkerpageState extends State<Workerpage> {
         backgroundColor: Colors.white,
         appBar: AppBar(
           title: Text(
-            'Welcome, \${userData.name}',
-            style: TextStyle(color: Colors.white, fontSize: 20),
+            'Welcome, ${userData.name}',
+            style: TextStyle(color: Colors.white, fontSize: 25),
           ),
           backgroundColor: Colors.blue,
-          iconTheme: IconThemeData(color: Colors.black),
           leading: IconButton(
             icon: _buildProfileAvatar(radius: 20),
             onPressed: () {
               _scaffoldKey.currentState?.openDrawer();
             },
           ),
-          toolbarHeight: 70, // Increased AppBar height
         ),
-        drawer: Drawer(), // Your drawer content here...
+        drawer: Drawer(
+          child: ListView(
+            padding: EdgeInsets.zero,
+            children: [
+              UserAccountsDrawerHeader(
+                accountName: Text(userData.name),
+                accountEmail: Text(userData.phoneNumber),
+                currentAccountPicture: Stack(
+                  children: [
+                    _buildProfileAvatar(radius: 40),
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: GestureDetector(
+                        onTap: _pickImage,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                          ),
+                          padding: EdgeInsets.all(3),
+                          child: Icon(Icons.edit, size: 18, color: Colors.blue),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                decoration: BoxDecoration(color: Colors.blue),
+              ),
+              ListTile(
+                leading: Icon(Icons.logout),
+                title: Text('Logout'),
+                onTap: () async {
+                  bool shouldLogout = await showDialog(
+                    context: context,
+                    builder:
+                        (context) => AlertDialog(
+                          title: Text("Confirm Logout"),
+                          content: Text("Are you sure you want to logout?"),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(context).pop(false),
+                              child: Text("Cancel"),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.of(context).pop(true),
+                              child: Text("Confirm"),
+                            ),
+                          ],
+                        ),
+                  );
+                  if (shouldLogout == true) {
+                    SharedPreferences prefs =
+                        await SharedPreferences.getInstance();
+                    await prefs.setBool('isLoggedIn', false);
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const LoginScreen(),
+                      ),
+                    );
+                  }
+                },
+              ),
+              Divider(),
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text(
+                  'Profile Details',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+              _buildProfileDetail('User Id', userData.userId),
+              _buildProfileDetail('Role', userData.role),
+              _buildProfileDetail('Gender', userData.gender),
+              _buildProfileDetail(
+                'DOB',
+                userData.dob?.toLocal().toString().split(' ')[0] ?? 'Not Set',
+              ),
+              _buildProfileDetail('Phone', userData.phoneNumber),
+              _buildProfileDetail('Country', userData.country),
+              _buildProfileDetail('State', userData.state),
+              _buildProfileDetail('District', userData.district),
+              _buildProfileDetail('City', userData.city),
+              _buildProfileDetail('Area', userData.area),
+              _buildProfileDetail('Address', userData.address),
+              if (userData.role == 'Worker')
+                _buildProfileDetail('Experience', userData.experience),
+            ],
+          ),
+        ),
         body:
             isLoading
                 ? Center(child: CircularProgressIndicator())
@@ -270,7 +337,7 @@ class _WorkerpageState extends State<Workerpage> {
                   itemCount: posts.length,
                   itemBuilder: (context, index) {
                     final post = posts[index];
-                    final alreadyApplied = appliedJobIds.contains(post.userId);
+                    final isApplied = appliedJobs[post.postId] ?? false;
                     return Card(
                       margin: EdgeInsets.all(8.0),
                       child: Padding(
@@ -279,7 +346,7 @@ class _WorkerpageState extends State<Workerpage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              "Job Provider ID: \${post.userId}",
+                              "Job Provider ID: ${post.userId}",
                               style: TextStyle(fontWeight: FontWeight.bold),
                             ),
                             SizedBox(height: 10),
@@ -309,11 +376,16 @@ class _WorkerpageState extends State<Workerpage> {
                               alignment: Alignment.centerRight,
                               child: ElevatedButton(
                                 onPressed:
-                                    alreadyApplied
+                                    isApplied
                                         ? null
-                                        : () => _applyForJob(post.userId),
+                                        : () {
+                                          _applyForJob(
+                                            post.userId,
+                                            post.postId,
+                                          );
+                                        },
                                 child: Text(
-                                  alreadyApplied ? "Applied" : "Apply Now",
+                                  isApplied ? "Applied" : "Apply Now",
                                 ),
                               ),
                             ),
@@ -334,6 +406,16 @@ class _WorkerpageState extends State<Workerpage> {
               ? FileImage(File(userData.profileImage!))
               : AssetImage('assets/default_profile.png') as ImageProvider,
       radius: radius,
+    );
+  }
+
+  Widget _buildProfileDetail(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 16.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [Text('$label: '), Text(value)],
+      ),
     );
   }
 }
