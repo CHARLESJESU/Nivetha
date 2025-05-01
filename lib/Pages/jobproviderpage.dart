@@ -120,13 +120,13 @@ class _JobproviderpageState extends State<Jobproviderpage> {
   Widget _buildSelectedPage() {
     switch (_selectedIndex) {
       case 0:
-        return OrderDetailsPage();
+        return OrderDetailsPage(userId: widget.userData.userId);
       case 1:
-        return ApplicationsPage();
+        return ApplicationsPage(jobProviderUserId: userData.userId);
       case 2:
         return MessagesPage();
       default:
-        return OrderDetailsPage();
+        return OrderDetailsPage(userId: widget.userData.userId);
     }
   }
 
@@ -139,7 +139,7 @@ class _JobproviderpageState extends State<Jobproviderpage> {
       child: Scaffold(
         key: _scaffoldKey,
         appBar: AppBar(
-          title: Text('Welcome Job provider, ${userData.name}'),
+          title: Text(' ${userData.name}'),
           backgroundColor: Colors.blue,
           leading: IconButton(
             icon: _buildProfileAvatar(radius: 20),
@@ -158,7 +158,10 @@ class _JobproviderpageState extends State<Jobproviderpage> {
                   onPressed: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => FormPage()),
+                      MaterialPageRoute(
+                        builder:
+                            (_) => FormPage(userId: widget.userData.userId),
+                      ),
                     );
                   },
                   child: Icon(Icons.add),

@@ -1,117 +1,135 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 
 class FormPage extends StatefulWidget {
+  final String userId;
+
+  FormPage({required this.userId});
+
   @override
   _FormPageState createState() => _FormPageState();
 }
 
 class _FormPageState extends State<FormPage> {
-  File? _image;
-  final picker = ImagePicker();
+  File? _imageFile;
   final TextEditingController _descriptionController = TextEditingController();
+  final DatabaseReference _dbRef = FirebaseDatabase.instance
+      .ref()
+      .child('jobs')
+      .child('workers');
+  bool _isUploading = false;
 
-  // Pick an image from the gallery
   Future<void> _pickImage() async {
-    final picked = await picker.pickImage(source: ImageSource.gallery);
+    final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
     if (picked != null) {
-      setState(() => _image = File(picked.path));
+      setState(() {
+        _imageFile = File(picked.path);
+      });
     }
   }
 
-  // Remove the selected image
-  void _removeImage() {
-    setState(() {
-      _image = null;
-    });
+  Future<String> _convertImageToBase64(File imageFile) async {
+    try {
+      List<int> imageBytes = await imageFile.readAsBytes();
+      return base64Encode(imageBytes);
+    } catch (e) {
+      print("Image conversion failed: $e");
+      return '';
+    }
   }
 
-  // Handle submission of data
-  void _submitData() {
-    if (_image != null && _descriptionController.text.isNotEmpty) {
-      Navigator.pop(context, {
-        'image': _image,
-        'description': _descriptionController.text,
-      });
-    } else {
+  Future<void> _uploadOrder() async {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("User not logged in")));
+      return;
+    }
+
+    if (_imageFile == null || _descriptionController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text("Please select an image and enter a description"),
         ),
       );
+      return;
+    }
+
+    setState(() {
+      _isUploading = true;
+    });
+
+    try {
+      final userId = widget.userId;
+
+      final base64Image = await _convertImageToBase64(_imageFile!);
+
+      // ✅ Save multiple jobs using .push()
+      await _dbRef.child(userId).push().set({
+        'description': _descriptionController.text,
+        'imageBase64': base64Image,
+      });
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Job posted successfully!")));
+
+      Navigator.pop(context); // Return to previous screen
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Failed to post job: $e")));
+    } finally {
+      setState(() {
+        _isUploading = false;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Create Post")),
+      appBar: AppBar(title: Text("Post Job")),
       body: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // Large description box (like a LinkedIn post)
-            Container(
-              height: 300, // Large height for the description box
-              width: double.infinity, // Full width
-              child: TextField(
+        padding: const EdgeInsets.all(16),
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              TextField(
                 controller: _descriptionController,
-                maxLines: 20, // Allows the text field to expand vertically
-                keyboardType: TextInputType.multiline,
-                decoration: InputDecoration(
-                  hintText: "What's on your mind?",
-                  border: OutlineInputBorder(),
-                ),
+                maxLines: 3,
+                decoration: InputDecoration(labelText: 'Enter Description'),
               ),
-            ),
-            SizedBox(height: 100),
-
-            // Center the image picker icon
-            Center(
-              child: GestureDetector(
-                onTap: _pickImage,
-                child: Container(
-                  height: 100, // Fixed size for the image picker
-                  width: 100, // Fixed size for the image picker
-                  color: Colors.grey[300],
-                  child:
-                      _image != null
-                          ? Stack(
-                            children: [
-                              Image.file(_image!, fit: BoxFit.cover),
-                              Positioned(
-                                top: 10,
-                                right: 10,
-                                child: IconButton(
-                                  icon: Icon(
-                                    Icons.remove_circle,
-                                    color: Colors.red,
-                                  ),
-                                  onPressed: _removeImage,
-                                ),
-                              ),
-                            ],
-                          )
-                          : Icon(
-                            Icons.camera_alt,
-                            size: 50,
-                            color: Colors.grey[700],
-                          ),
-                ),
+              SizedBox(height: 16),
+              _imageFile != null
+                  ? Image.file(_imageFile!, height: 200)
+                  : Container(
+                    height: 200,
+                    color: Colors.grey[300],
+                    child: Center(child: Text("No image selected")),
+                  ),
+              SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: _pickImage,
+                icon: Icon(Icons.image),
+                label: Text("Pick Image"),
               ),
-            ),
-            SizedBox(height: 100),
-
-            // Submit button at the bottom
-            Center(
-              child: ElevatedButton(
-                onPressed: _submitData,
-                child: Text("Post"),
+              SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _isUploading ? null : _uploadOrder,
+                child:
+                    _isUploading
+                        ? CircularProgressIndicator(color: Colors.white)
+                        : Text("Post"),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
