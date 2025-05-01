@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../login/Login.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:get/get.dart';
 
 class Workerpage extends StatefulWidget {
   final UserData userData;
@@ -282,12 +283,7 @@ class _WorkerpageState extends State<Workerpage> {
                     SharedPreferences prefs =
                         await SharedPreferences.getInstance();
                     await prefs.setBool('isLoggedIn', false);
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const LoginScreen(),
-                      ),
-                    );
+                    Get.offAll(() => const LoginScreen());
                   }
                 },
               ),
@@ -340,13 +336,9 @@ class _WorkerpageState extends State<Workerpage> {
                             if (post.imageBase64.isNotEmpty)
                               GestureDetector(
                                 onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder:
-                                          (_) => FullImagePage(
-                                            imageBase64: post.imageBase64,
-                                          ),
+                                  Get.to(
+                                    () => FullImagePage(
+                                      imageBase64: post.imageBase64,
                                     ),
                                   );
                                 },
