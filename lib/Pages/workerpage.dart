@@ -26,9 +26,6 @@ class _WorkerpageState extends State<Workerpage> {
   List<Post> posts = [];
   bool isLoading = true;
 
-  // Store whether the user has already applied for a specific job
-  Map<String, bool> appliedJobs = {};
-
   @override
   void initState() {
     super.initState();
@@ -165,7 +162,7 @@ class _WorkerpageState extends State<Workerpage> {
     }
   }
 
-  Future<void> _applyForJob(String jobProviderUserId, String postId) async {
+  Future<void> _applyForJob(String jobProviderUserId) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -175,8 +172,7 @@ class _WorkerpageState extends State<Workerpage> {
     }
 
     try {
-      final workerUserId =
-          userData.userId; // Using userData.userId instead of Firebase UID
+      final workerUserId = userData.userId;
 
       final workerDetails = {
         'workerUserId': workerUserId,
@@ -194,18 +190,12 @@ class _WorkerpageState extends State<Workerpage> {
         'address': userData.address,
       };
 
-      // Save worker details using the userData.userId as the worker's unique ID
       final applicationRef = FirebaseDatabase.instance
           .ref('applications')
-          .child(jobProviderUserId) // The job provider's user ID
-          .child(workerUserId); // The worker's userId from userData
+          .child(jobProviderUserId)
+          .child(workerUserId);
 
       await applicationRef.set(workerDetails);
-
-      // Update the appliedJobs map
-      setState(() {
-        appliedJobs[postId] = true;
-      });
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Successfully applied to the job!')),
@@ -225,9 +215,14 @@ class _WorkerpageState extends State<Workerpage> {
       onWillPop: _onWillPop,
       child: Scaffold(
         key: _scaffoldKey,
+        backgroundColor: Colors.white,
         appBar: AppBar(
-          title: Text('Welcome, ${userData.name}'),
-          backgroundColor: Colors.blue,
+          title: Text(
+            'Welcome, ${userData.name}',
+            style: TextStyle(color: Colors.white),
+          ),
+          backgroundColor: Colors.white,
+          iconTheme: IconThemeData(color: Colors.black),
           leading: IconButton(
             icon: _buildProfileAvatar(radius: 20),
             onPressed: () {
@@ -333,7 +328,6 @@ class _WorkerpageState extends State<Workerpage> {
                   itemCount: posts.length,
                   itemBuilder: (context, index) {
                     final post = posts[index];
-                    final isApplied = appliedJobs[post.postId] ?? false;
                     return Card(
                       margin: EdgeInsets.all(8.0),
                       child: Padding(
@@ -371,18 +365,10 @@ class _WorkerpageState extends State<Workerpage> {
                             Align(
                               alignment: Alignment.centerRight,
                               child: ElevatedButton(
-                                onPressed:
-                                    isApplied
-                                        ? null
-                                        : () {
-                                          _applyForJob(
-                                            post.userId,
-                                            post.postId,
-                                          );
-                                        },
-                                child: Text(
-                                  isApplied ? "Applied" : "Apply Now",
-                                ),
+                                onPressed: () {
+                                  _applyForJob(post.userId);
+                                },
+                                child: Text("Apply Now"),
                               ),
                             ),
                           ],
