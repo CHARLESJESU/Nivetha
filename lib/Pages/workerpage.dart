@@ -219,9 +219,9 @@ class _WorkerpageState extends State<Workerpage> {
         appBar: AppBar(
           title: Text(
             'Welcome, ${userData.name}',
-            style: TextStyle(color: Colors.white),
+            style: TextStyle(color: Colors.black),
           ),
-          backgroundColor: Colors.white,
+          backgroundColor: Colors.blue,
           iconTheme: IconThemeData(color: Colors.black),
           leading: IconButton(
             icon: _buildProfileAvatar(radius: 20),
