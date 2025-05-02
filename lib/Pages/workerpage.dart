@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:get/get.dart';
+
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:nivetha123/screens/user_data.dart';
@@ -8,6 +10,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../login/Login.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+
+import 'Backcontroll.dart';
 
 class Workerpage extends StatefulWidget {
   final UserData userData;
@@ -20,8 +24,7 @@ class Workerpage extends StatefulWidget {
 
 class _WorkerpageState extends State<Workerpage> {
   late UserData userData;
-  int _backPressCounter = 0;
-  DateTime? _lastBackPressed;
+
 
   List<Post> posts = [];
   bool isLoading = true;
@@ -80,7 +83,7 @@ class _WorkerpageState extends State<Workerpage> {
       });
     }
   }
-
+  //
   Future<void> _pickImage() async {
     final picker = ImagePicker();
     final XFile? image = await showModalBottomSheet<XFile?>(
@@ -122,45 +125,6 @@ class _WorkerpageState extends State<Workerpage> {
     }
   }
 
-  Future<bool> _onWillPop() async {
-    DateTime now = DateTime.now();
-    if (_lastBackPressed == null ||
-        now.difference(_lastBackPressed!) > Duration(seconds: 2)) {
-      _lastBackPressed = now;
-      _backPressCounter = 1;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Press back again to confirm exit')),
-      );
-      return Future.value(false);
-    } else {
-      _backPressCounter++;
-      if (_backPressCounter >= 2) {
-        final shouldExit = await showDialog<bool>(
-          context: context,
-          builder: (context) {
-            return AlertDialog(
-              title: Text('Exit App'),
-              content: Text('Are you sure you want to exit?'),
-              actions: [
-                TextButton(
-                  child: Text('Cancel'),
-                  onPressed: () => Navigator.of(context).pop(false),
-                ),
-                TextButton(
-                  child: Text('Exit'),
-                  onPressed: () => Navigator.of(context).pop(true),
-                ),
-              ],
-            );
-          },
-        );
-        if (shouldExit == true) {
-          SystemNavigator.pop();
-        }
-      }
-      return Future.value(false);
-    }
-  }
 
   Future<void> _applyForJob(String jobProviderUserId) async {
     final user = FirebaseAuth.instance.currentUser;
@@ -212,9 +176,11 @@ class _WorkerpageState extends State<Workerpage> {
   @override
   Widget build(BuildContext context) {
     final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+    final BackButtonController backController = Get.put(BackButtonController());
+
 
     return WillPopScope(
-      onWillPop: _onWillPop,
+      onWillPop: backController.handleWillPop,
       child: Scaffold(
         key: _scaffoldKey,
         appBar: AppBar(
@@ -260,37 +226,21 @@ class _WorkerpageState extends State<Workerpage> {
                 leading: Icon(Icons.logout),
                 title: Text('Logout'),
                 onTap: () async {
-                  bool shouldLogout = await showDialog(
-                    context: context,
-                    builder:
-                        (context) => AlertDialog(
-                          title: Text("Confirm Logout"),
-                          content: Text("Are you sure you want to logout?"),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.of(context).pop(false),
-                              child: Text("Cancel"),
-                            ),
-                            TextButton(
-                              onPressed: () => Navigator.of(context).pop(true),
-                              child: Text("Confirm"),
-                            ),
-                          ],
-                        ),
+                  Get.defaultDialog(
+                    title: "Confirm Logout",
+                    middleText: "Are you sure you want to logout?",
+                    textCancel: "Cancel",
+                    textConfirm: "Confirm",
+                    onConfirm: () async {
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.setBool('isLoggedIn', false);
+                      Get.offAll(() => const LoginScreen());
+                    },
+                    onCancel: () {},
                   );
-                  if (shouldLogout == true) {
-                    SharedPreferences prefs =
-                        await SharedPreferences.getInstance();
-                    await prefs.setBool('isLoggedIn', false);
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const LoginScreen(),
-                      ),
-                    );
-                  }
                 },
               ),
+
               Divider(),
               Padding(
                 padding: const EdgeInsets.all(16.0),
@@ -413,16 +363,3 @@ class Post {
   });
 }
 
-class FullImagePage extends StatelessWidget {
-  final String imageBase64;
-
-  const FullImagePage({Key? key, required this.imageBase64}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('Full Image')),
-      body: Center(child: Image.memory(base64Decode(imageBase64))),
-    );
-  }
-}
