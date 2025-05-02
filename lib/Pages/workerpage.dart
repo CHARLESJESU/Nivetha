@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:nivetha123/Pages/post.dart';
 import 'package:nivetha123/screens/user_data.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -225,12 +226,8 @@ class _WorkerpageState extends State<Workerpage> {
       onWillPop: _onWillPop,
       child: Scaffold(
         key: _scaffoldKey,
-        backgroundColor: Colors.white,
         appBar: AppBar(
-          title: Text(
-            'Welcome, ${userData.name}',
-            style: TextStyle(color: Colors.white, fontSize: 25),
-          ),
+          title: Text('Welcome, ${userData.name}'),
           backgroundColor: Colors.blue,
           leading: IconButton(
             icon: _buildProfileAvatar(radius: 20),
@@ -416,34 +413,6 @@ class _WorkerpageState extends State<Workerpage> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [Text('$label: '), Text(value)],
       ),
-    );
-  }
-}
-
-class Post {
-  final String userId;
-  final String postId;
-  final String description;
-  final String imageBase64;
-
-  Post({
-    required this.userId,
-    required this.postId,
-    required this.description,
-    required this.imageBase64,
-  });
-}
-
-class FullImagePage extends StatelessWidget {
-  final String imageBase64;
-
-  const FullImagePage({Key? key, required this.imageBase64}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('Full Image')),
-      body: Center(child: Image.memory(base64Decode(imageBase64))),
     );
   }
 }
