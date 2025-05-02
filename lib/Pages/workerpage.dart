@@ -186,8 +186,11 @@ class _WorkerpageState extends State<Workerpage> {
       child: Scaffold(
         key: _scaffoldKey,
         appBar: AppBar(
-          title: Text('Welcome, ${userData.name}'),
-          backgroundColor: Colors.blue,
+          title: Text(
+            'Welcome, ${userData.name}',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          backgroundColor: Colors.blueAccent,
           leading: IconButton(
             icon: _buildProfileAvatar(radius: 20),
             onPressed: () => _scaffoldKey.currentState?.openDrawer(),
@@ -198,7 +201,10 @@ class _WorkerpageState extends State<Workerpage> {
             padding: EdgeInsets.zero,
             children: [
               UserAccountsDrawerHeader(
-                accountName: Text(userData.name),
+                accountName: Text(
+                  userData.name,
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
                 accountEmail: Text(userData.phoneNumber),
                 currentAccountPicture: Stack(
                   children: [
@@ -214,13 +220,17 @@ class _WorkerpageState extends State<Workerpage> {
                             shape: BoxShape.circle,
                           ),
                           padding: EdgeInsets.all(3),
-                          child: Icon(Icons.edit, size: 18, color: Colors.blue),
+                          child: Icon(
+                            Icons.edit,
+                            size: 18,
+                            color: Colors.blueAccent,
+                          ),
                         ),
                       ),
                     ),
                   ],
                 ),
-                decoration: BoxDecoration(color: Colors.blue),
+                decoration: BoxDecoration(color: Colors.blueAccent),
               ),
               ListTile(
                 leading: Icon(Icons.logout),
@@ -287,7 +297,7 @@ class _WorkerpageState extends State<Workerpage> {
                     final isApplied = appliedJobs[post.postId] ?? false;
                     return Card(
                       margin: EdgeInsets.all(12.0),
-                      elevation: 4,
+                      elevation: 8,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(15),
                       ),
@@ -298,7 +308,10 @@ class _WorkerpageState extends State<Workerpage> {
                           children: [
                             Text(
                               "Job Provider ID: ${post.userId}",
-                              style: TextStyle(fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blueAccent,
+                              ),
                             ),
                             SizedBox(height: 10),
                             if (post.imageBase64.isNotEmpty)
@@ -312,7 +325,10 @@ class _WorkerpageState extends State<Workerpage> {
                                 ),
                               ),
                             SizedBox(height: 10),
-                            Text(post.description),
+                            Text(
+                              post.description,
+                              style: TextStyle(fontSize: 16),
+                            ),
                             Align(
                               alignment: Alignment.centerRight,
                               child: ElevatedButton(
@@ -328,7 +344,9 @@ class _WorkerpageState extends State<Workerpage> {
                                 ),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor:
-                                      isApplied ? Colors.grey : Colors.blue,
+                                      isApplied
+                                          ? Colors.grey
+                                          : Colors.blueAccent,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(10),
                                   ),
@@ -357,7 +375,13 @@ class _WorkerpageState extends State<Workerpage> {
     padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 16.0),
     child: Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [Text('$label:'), Text(value)],
+      children: [
+        Text(
+          '$label:',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        ),
+        Text(value, style: TextStyle(fontSize: 16)),
+      ],
     ),
   );
 }
