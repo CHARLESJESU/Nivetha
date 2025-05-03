@@ -291,80 +291,86 @@ class _WorkerpageState extends State<Workerpage> {
             ],
           ),
         ),
-          body: isLoading
-              ? Center(child: CircularProgressIndicator())
-              : ListView.builder(
-            itemCount: posts.length,
-            itemBuilder: (context, index) {
-              final post = posts[index];
-              final isApplied = appliedJobs[post.postId] ?? false;
-              return Container(
-                margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.2),
-                      spreadRadius: 2,
-                      blurRadius: 5,
-                      offset: Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "Job Provider ID: ${post.userId}",
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          color: Colors.blue[800],
-                        ),
+        body:
+            isLoading
+                ? Center(child: CircularProgressIndicator())
+                : posts.isEmpty
+                ? Center(child: Text("No jobs available."))
+                : ListView.builder(
+                  padding: const EdgeInsets.all(12),
+                  itemCount: posts.length,
+                  itemBuilder: (context, index) {
+                    final post = posts[index];
+                    final isApplied = appliedJobs[post.postId] ?? false;
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      elevation: 5,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      SizedBox(height: 12),
-                      if (post.imageBase64.isNotEmpty)
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.memory(
-                            base64Decode(post.imageBase64),
-                            height: 160,
-                            width: double.infinity,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                      SizedBox(height: 12),
-                      Text(
-                        post.description,
-                        style: TextStyle(fontSize: 15),
-                      ),
-                      SizedBox(height: 12),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: ElevatedButton.icon(
-                          onPressed: isApplied
-                              ? null
-                              : () => _applyForJob(post.userId, post.postId),
-                          icon: Icon(Icons.work),
-                          label: Text(isApplied ? "Applied" : "Apply Now"),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor:
-                            isApplied ? Colors.grey : Colors.blueAccent,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "Job by: ${post.userId}",
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey[700],
+                              ),
                             ),
-                          ),
+                            SizedBox(height: 8),
+                            if (post.imageBase64.isNotEmpty)
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: Image.memory(
+                                  base64Decode(post.imageBase64),
+                                  height: 180,
+                                  width: double.infinity,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                            SizedBox(height: 12),
+                            Text(
+                              post.description,
+                              style: TextStyle(fontSize: 16),
+                            ),
+                            SizedBox(height: 12),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: ElevatedButton(
+                                onPressed:
+                                    isApplied
+                                        ? null
+                                        : () => _applyForJob(
+                                          post.userId,
+                                          post.postId,
+                                        ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor:
+                                      isApplied
+                                          ? Colors.grey
+                                          : Colors.blueAccent,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                child: Text(
+                                  isApplied ? "Applied" : "Apply Now",
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
+                    );
+                  },
                 ),
-              );
-            },
-          ),
+      ),
+    );
+  }
 
   Widget _buildProfileAvatar({required double radius}) => CircleAvatar(
     backgroundImage:
