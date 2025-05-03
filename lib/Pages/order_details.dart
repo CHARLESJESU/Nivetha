@@ -212,7 +212,6 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                             },
                           ),
                         ),
-
                         GestureDetector(
                           onTap: () => _openFullImage(order.imageBase64),
                           child:
@@ -222,7 +221,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                                     child: Image.memory(
                                       _decodeBase64(order.imageBase64),
                                       width: screenWidth,
-                                      height: screenWidth / 2, // half screen
+                                      height: screenWidth / 2,
                                       fit: BoxFit.cover,
                                     ),
                                   )
@@ -235,36 +234,11 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                                     child: Center(child: Text("No image")),
                                   ),
                         ),
-
                         Padding(
                           padding: const EdgeInsets.all(12.0),
                           child: Text(
                             order.description,
                             style: TextStyle(fontSize: 16),
-                          ),
-                        ),
-
-                        Divider(),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          child: Row(
-                            children: [
-                              IconButton(
-                                icon: Icon(Icons.thumb_up_alt_outlined),
-                                onPressed: () {
-                                  print("Liked post ${order.id}");
-                                },
-                              ),
-                              Text("Like"),
-                              SizedBox(width: 24),
-                              IconButton(
-                                icon: Icon(Icons.comment_outlined),
-                                onPressed: () {
-                                  print("View comments for ${order.id}");
-                                },
-                              ),
-                              Text("Comments"),
-                            ],
                           ),
                         ),
                         SizedBox(height: 12),
