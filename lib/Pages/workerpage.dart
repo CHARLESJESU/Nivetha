@@ -116,7 +116,9 @@ class _WorkerpageState extends State<Workerpage> {
         now.difference(_lastBackPressed!) > Duration(seconds: 2)) {
       _lastBackPressed = now;
       _backPressCounter = 1;
-      Get.snackbar('Exit', 'Press back again to confirm exit');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Press back again to confirm exit')),
+      );
       return Future.value(false);
     } else {
       _backPressCounter++;
@@ -146,7 +148,9 @@ class _WorkerpageState extends State<Workerpage> {
   Future<void> _applyForJob(String jobProviderUserId, String postId) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      Get.snackbar("Error", "Please log in to apply for jobs");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Please log in to apply for jobs")),
+      );
       return;
     }
     try {
@@ -172,9 +176,13 @@ class _WorkerpageState extends State<Workerpage> {
           .child(workerUserId);
       await applicationRef.set(workerDetails);
       setState(() => appliedJobs[postId] = true);
-      Get.snackbar("Success", "Successfully applied to the job!");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Successfully applied to the job!")),
+      );
     } catch (e) {
-      Get.snackbar("Error", "Failed to apply to the job: $e");
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Failed to apply to the job: $e")));
     }
   }
 
@@ -315,16 +323,15 @@ class _WorkerpageState extends State<Workerpage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Job by text (above image)
                             Padding(
                               padding: const EdgeInsets.only(
                                 left: 4,
                                 bottom: 8,
                               ),
                               child: Text(
-                                "Job by: ${post.userId}",
+                                "Job Provider Id: ${post.userId}",
                                 style: TextStyle(
-                                  fontSize: 14,
+                                  fontSize: 18,
                                   fontWeight: FontWeight.bold,
                                   color: Colors.blueAccent,
                                 ),
@@ -333,7 +340,6 @@ class _WorkerpageState extends State<Workerpage> {
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                // Image
                                 if (post.imageBase64.isNotEmpty)
                                   GestureDetector(
                                     onTap: () {
@@ -374,7 +380,6 @@ class _WorkerpageState extends State<Workerpage> {
                                     ),
                                   ),
                                 SizedBox(width: 12),
-                                // Description and button
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment:
@@ -399,7 +404,7 @@ class _WorkerpageState extends State<Workerpage> {
                                                     post.postId,
                                                   ),
                                           icon: Icon(
-                                            Icons.send,
+                                            Icons.work,
                                             color: Colors.white,
                                           ),
                                           label: Text(
@@ -412,7 +417,7 @@ class _WorkerpageState extends State<Workerpage> {
                                             backgroundColor:
                                                 isApplied
                                                     ? Colors.grey
-                                                    : Colors.green,
+                                                    : Colors.blue,
                                             shape: RoundedRectangleBorder(
                                               borderRadius:
                                                   BorderRadius.circular(10),
