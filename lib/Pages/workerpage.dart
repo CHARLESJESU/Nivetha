@@ -1,17 +1,17 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:nivetha123/screens/user_data.dart';
 import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../login/Login.dart';
+import 'package:get/get.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../login/Login.dart';
+import '../screens/user_data.dart';
 
 class Workerpage extends StatefulWidget {
   final UserData userData;
-
   const Workerpage({Key? key, required this.userData}) : super(key: key);
 
   @override
@@ -22,10 +22,8 @@ class _WorkerpageState extends State<Workerpage> {
   late UserData userData;
   int _backPressCounter = 0;
   DateTime? _lastBackPressed;
-
   List<Post> posts = [];
   bool isLoading = true;
-
   Map<String, bool> appliedJobs = {};
 
   @override
@@ -46,11 +44,9 @@ class _WorkerpageState extends State<Workerpage> {
     try {
       final postsRef = FirebaseDatabase.instance.ref().child('jobs/workers');
       final snapshot = await postsRef.get();
-
       List<Post> fetchedPosts = [];
       if (snapshot.exists) {
         final workersData = snapshot.value as Map<dynamic, dynamic>;
-
         workersData.forEach((userId, postsData) {
           if (postsData is Map<dynamic, dynamic>) {
             postsData.forEach((key, value) {
@@ -68,18 +64,14 @@ class _WorkerpageState extends State<Workerpage> {
           }
         });
       }
-
       fetchedPosts.sort((a, b) => b.postId.compareTo(a.postId));
-
       setState(() {
         posts = fetchedPosts;
         isLoading = false;
       });
     } catch (e) {
       print("Failed to load posts: $e");
-      setState(() {
-        isLoading = false;
-      });
+      setState(() => isLoading = false);
     }
   }
 
@@ -87,41 +79,35 @@ class _WorkerpageState extends State<Workerpage> {
     final picker = ImagePicker();
     final XFile? image = await showModalBottomSheet<XFile?>(
       context: context,
-      builder: (context) {
-        return SafeArea(
-          child: Wrap(
-            children: [
-              ListTile(
-                leading: Icon(Icons.camera_alt),
-                title: Text('Take Photo'),
-                onTap: () async {
-                  final picked = await picker.pickImage(
-                    source: ImageSource.camera,
-                  );
-                  Navigator.pop(context, picked);
-                },
-              ),
-              ListTile(
-                leading: Icon(Icons.photo_library),
-                title: Text('Choose from Gallery'),
-                onTap: () async {
-                  final picked = await picker.pickImage(
-                    source: ImageSource.gallery,
-                  );
-                  Navigator.pop(context, picked);
-                },
-              ),
-            ],
+      builder:
+          (context) => SafeArea(
+            child: Wrap(
+              children: [
+                ListTile(
+                  leading: Icon(Icons.camera_alt),
+                  title: Text('Take Photo'),
+                  onTap: () async {
+                    final picked = await picker.pickImage(
+                      source: ImageSource.camera,
+                    );
+                    Navigator.pop(context, picked);
+                  },
+                ),
+                ListTile(
+                  leading: Icon(Icons.photo_library),
+                  title: Text('Choose from Gallery'),
+                  onTap: () async {
+                    final picked = await picker.pickImage(
+                      source: ImageSource.gallery,
+                    );
+                    Navigator.pop(context, picked);
+                  },
+                ),
+              ],
+            ),
           ),
-        );
-      },
     );
-
-    if (image != null) {
-      setState(() {
-        userData.profileImage = image.path;
-      });
-    }
+    if (image != null) setState(() => userData.profileImage = image.path);
   }
 
   Future<bool> _onWillPop() async {
@@ -130,34 +116,28 @@ class _WorkerpageState extends State<Workerpage> {
         now.difference(_lastBackPressed!) > Duration(seconds: 2)) {
       _lastBackPressed = now;
       _backPressCounter = 1;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Press back again to confirm exit')),
-      );
+      Get.snackbar('Exit', 'Press back again to confirm exit');
       return Future.value(false);
     } else {
       _backPressCounter++;
       if (_backPressCounter >= 2) {
-        final shouldExit = await showDialog<bool>(
-          context: context,
-          builder:
-              (context) => AlertDialog(
-                title: Text('Exit App'),
-                content: Text('Are you sure you want to exit?'),
-                actions: [
-                  TextButton(
-                    child: Text('Cancel'),
-                    onPressed: () => Navigator.of(context).pop(false),
-                  ),
-                  TextButton(
-                    child: Text('Exit'),
-                    onPressed: () => Navigator.of(context).pop(true),
-                  ),
-                ],
+        bool? shouldExit = await Get.dialog(
+          AlertDialog(
+            title: Text('Exit App'),
+            content: Text('Are you sure you want to exit?'),
+            actions: [
+              TextButton(
+                onPressed: () => Get.back(result: false),
+                child: Text('Cancel'),
               ),
+              TextButton(
+                onPressed: () => Get.back(result: true),
+                child: Text('Exit'),
+              ),
+            ],
+          ),
         );
-        if (shouldExit == true) {
-          SystemNavigator.pop();
-        }
+        if (shouldExit == true) SystemNavigator.pop();
       }
       return Future.value(false);
     }
@@ -166,15 +146,11 @@ class _WorkerpageState extends State<Workerpage> {
   Future<void> _applyForJob(String jobProviderUserId, String postId) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Please log in to apply for jobs")),
-      );
+      Get.snackbar("Error", "Please log in to apply for jobs");
       return;
     }
-
     try {
       final workerUserId = userData.userId;
-
       final workerDetails = {
         'workerUserId': workerUserId,
         'name': userData.name,
@@ -190,39 +166,35 @@ class _WorkerpageState extends State<Workerpage> {
         'area': userData.area,
         'address': userData.address,
       };
-
       final applicationRef = FirebaseDatabase.instance
           .ref('applications')
           .child(jobProviderUserId)
           .child(workerUserId);
-
       await applicationRef.set(workerDetails);
-
-      setState(() {
-        appliedJobs[postId] = true;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Successfully applied to the job!')),
-      );
+      setState(() => appliedJobs[postId] = true);
+      Get.snackbar("Success", "Successfully applied to the job!");
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to apply to the job: $e')));
+      Get.snackbar("Error", "Failed to apply to the job: $e");
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-
     return WillPopScope(
       onWillPop: _onWillPop,
       child: Scaffold(
         key: _scaffoldKey,
         appBar: AppBar(
-          title: Text('Welcome, ${userData.name}'),
-          backgroundColor: Colors.blue,
+          title: Text(
+            'Welcome, ${userData.name}',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+              fontSize: 25,
+            ),
+          ),
+          backgroundColor: Colors.blueAccent,
           leading: IconButton(
             icon: _buildProfileAvatar(radius: 20),
             onPressed: () => _scaffoldKey.currentState?.openDrawer(),
@@ -233,7 +205,10 @@ class _WorkerpageState extends State<Workerpage> {
             padding: EdgeInsets.zero,
             children: [
               UserAccountsDrawerHeader(
-                accountName: Text(userData.name),
+                accountName: Text(
+                  userData.name,
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
                 accountEmail: Text(userData.phoneNumber),
                 currentAccountPicture: Stack(
                   children: [
@@ -249,46 +224,43 @@ class _WorkerpageState extends State<Workerpage> {
                             shape: BoxShape.circle,
                           ),
                           padding: EdgeInsets.all(3),
-                          child: Icon(Icons.edit, size: 18, color: Colors.blue),
+                          child: Icon(
+                            Icons.edit,
+                            size: 18,
+                            color: Colors.blueAccent,
+                          ),
                         ),
                       ),
                     ),
                   ],
                 ),
-                decoration: BoxDecoration(color: Colors.blue),
+                decoration: BoxDecoration(color: Colors.blueAccent),
               ),
               ListTile(
                 leading: Icon(Icons.logout),
                 title: Text('Logout'),
                 onTap: () async {
-                  bool shouldLogout = await showDialog(
-                    context: context,
-                    builder:
-                        (context) => AlertDialog(
-                          title: Text("Confirm Logout"),
-                          content: Text("Are you sure you want to logout?"),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.of(context).pop(false),
-                              child: Text("Cancel"),
-                            ),
-                            TextButton(
-                              onPressed: () => Navigator.of(context).pop(true),
-                              child: Text("Confirm"),
-                            ),
-                          ],
+                  bool? shouldLogout = await Get.dialog(
+                    AlertDialog(
+                      title: Text("Confirm Logout"),
+                      content: Text("Are you sure you want to logout?"),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Get.back(result: false),
+                          child: Text("Cancel"),
                         ),
+                        TextButton(
+                          onPressed: () => Get.back(result: true),
+                          child: Text("Confirm"),
+                        ),
+                      ],
+                    ),
                   );
                   if (shouldLogout == true) {
                     SharedPreferences prefs =
                         await SharedPreferences.getInstance();
                     await prefs.setBool('isLoggedIn', false);
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const LoginScreen(),
-                      ),
-                    );
+                    Get.offAll(() => LoginScreen());
                   }
                 },
               ),
@@ -315,121 +287,106 @@ class _WorkerpageState extends State<Workerpage> {
               _buildProfileDetail('Area', userData.area),
               _buildProfileDetail('Address', userData.address),
               if (userData.role == 'Worker')
-                _buildProfileDetail('Experience', userData.experience),
+                _buildProfileDetail('Experience', userData.experience ?? ''),
             ],
           ),
         ),
-        body:
-            isLoading
-                ? Center(child: CircularProgressIndicator())
-                : ListView.builder(
-                  itemCount: posts.length,
-                  itemBuilder: (context, index) {
-                    final post = posts[index];
-                    final isApplied = appliedJobs[post.postId] ?? false;
-                    return Card(
-                      margin: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      elevation: 4,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              "Job Provider ID: ${post.userId}",
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            SizedBox(height: 10),
-                            if (post.imageBase64.isNotEmpty)
-                              GestureDetector(
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder:
-                                          (_) => FullImagePage(
-                                            imageBase64: post.imageBase64,
-                                          ),
-                                    ),
-                                  );
-                                },
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(10),
-                                  child: Image.memory(
-                                    base64Decode(post.imageBase64),
-                                    height: 200,
-                                    width: double.infinity,
-                                    fit: BoxFit.cover,
-                                  ),
-                                ),
-                              ),
-                            SizedBox(height: 10),
-                            Text(
-                              post.description,
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.black87,
-                              ),
-                            ),
-                            SizedBox(height: 10),
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: ElevatedButton(
-                                onPressed:
-                                    isApplied
-                                        ? null
-                                        : () => _applyForJob(
-                                          post.userId,
-                                          post.postId,
-                                        ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor:
-                                      isApplied ? Colors.grey : Colors.blue,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: 20,
-                                    vertical: 12,
-                                  ),
-                                ),
-                                child: Text(
-                                  isApplied ? "Applied" : "Apply Now",
-                                ),
-                              ),
-                            ),
-                          ],
+          body: isLoading
+              ? Center(child: CircularProgressIndicator())
+              : ListView.builder(
+            itemCount: posts.length,
+            itemBuilder: (context, index) {
+              final post = posts[index];
+              final isApplied = appliedJobs[post.postId] ?? false;
+              return Container(
+                margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.2),
+                      spreadRadius: 2,
+                      blurRadius: 5,
+                      offset: Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Job Provider ID: ${post.userId}",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: Colors.blue[800],
                         ),
                       ),
-                    );
-                  },
+                      SizedBox(height: 12),
+                      if (post.imageBase64.isNotEmpty)
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.memory(
+                            base64Decode(post.imageBase64),
+                            height: 160,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      SizedBox(height: 12),
+                      Text(
+                        post.description,
+                        style: TextStyle(fontSize: 15),
+                      ),
+                      SizedBox(height: 12),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: ElevatedButton.icon(
+                          onPressed: isApplied
+                              ? null
+                              : () => _applyForJob(post.userId, post.postId),
+                          icon: Icon(Icons.work),
+                          label: Text(isApplied ? "Applied" : "Apply Now"),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor:
+                            isApplied ? Colors.grey : Colors.blueAccent,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-      ),
-    );
-  }
+              );
+            },
+          ),
 
-  Widget _buildProfileAvatar({required double radius}) {
-    return CircleAvatar(
-      backgroundImage:
-          userData.profileImage != null && userData.profileImage!.isNotEmpty
-              ? FileImage(File(userData.profileImage!))
-              : AssetImage('assets/default_profile.png') as ImageProvider,
-      radius: radius,
-    );
-  }
+  Widget _buildProfileAvatar({required double radius}) => CircleAvatar(
+    backgroundImage:
+        userData.profileImage != null && userData.profileImage!.isNotEmpty
+            ? FileImage(File(userData.profileImage!))
+            : AssetImage('assets/default_profile.png') as ImageProvider,
+    radius: radius,
+  );
 
-  Widget _buildProfileDetail(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 16.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [Text('$label: '), Text(value)],
-      ),
-    );
-  }
+  Widget _buildProfileDetail(String label, String value) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 16.0),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          '$label:',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        ),
+        Text(value, style: TextStyle(fontSize: 16)),
+      ],
+    ),
+  );
 }
 
 class Post {
@@ -444,18 +401,4 @@ class Post {
     required this.description,
     required this.imageBase64,
   });
-}
-
-class FullImagePage extends StatelessWidget {
-  final String imageBase64;
-
-  const FullImagePage({Key? key, required this.imageBase64}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('Full Image')),
-      body: Center(child: Image.memory(base64Decode(imageBase64))),
-    );
-  }
 }
