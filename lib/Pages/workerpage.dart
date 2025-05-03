@@ -302,65 +302,132 @@ class _WorkerpageState extends State<Workerpage> {
                   itemBuilder: (context, index) {
                     final post = posts[index];
                     final isApplied = appliedJobs[post.postId] ?? false;
+
                     return Card(
+                      color: Color(0xFFF2F2F2),
                       margin: const EdgeInsets.only(bottom: 16),
-                      elevation: 5,
+                      elevation: 4,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Padding(
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(12),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              "Job by: ${post.userId}",
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.grey[700],
+                            // Job by text (above image)
+                            Padding(
+                              padding: const EdgeInsets.only(
+                                left: 4,
+                                bottom: 8,
                               ),
-                            ),
-                            SizedBox(height: 8),
-                            if (post.imageBase64.isNotEmpty)
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(10),
-                                child: Image.memory(
-                                  base64Decode(post.imageBase64),
-                                  height: 180,
-                                  width: double.infinity,
-                                  fit: BoxFit.cover,
+                              child: Text(
+                                "Job by: ${post.userId}",
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.blueAccent,
                                 ),
                               ),
-                            SizedBox(height: 12),
-                            Text(
-                              post.description,
-                              style: TextStyle(fontSize: 16),
                             ),
-                            SizedBox(height: 12),
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: ElevatedButton(
-                                onPressed:
-                                    isApplied
-                                        ? null
-                                        : () => _applyForJob(
-                                          post.userId,
-                                          post.postId,
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Image
+                                if (post.imageBase64.isNotEmpty)
+                                  GestureDetector(
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder:
+                                              (_) => Scaffold(
+                                                appBar: AppBar(
+                                                  backgroundColor: Colors.black,
+                                                  iconTheme: IconThemeData(
+                                                    color: Colors.white,
+                                                  ),
+                                                ),
+                                                backgroundColor: Colors.black,
+                                                body: Center(
+                                                  child: InteractiveViewer(
+                                                    child: Image.memory(
+                                                      base64Decode(
+                                                        post.imageBase64,
+                                                      ),
+                                                      fit: BoxFit.contain,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
                                         ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor:
-                                      isApplied
-                                          ? Colors.grey
-                                          : Colors.blueAccent,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
+                                      );
+                                    },
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(10),
+                                      child: Image.memory(
+                                        base64Decode(post.imageBase64),
+                                        height: 100,
+                                        width: 100,
+                                        fit: BoxFit.cover,
+                                      ),
+                                    ),
+                                  ),
+                                SizedBox(width: 12),
+                                // Description and button
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        post.description,
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          color: Colors.black87,
+                                        ),
+                                      ),
+                                      SizedBox(height: 12),
+                                      Align(
+                                        alignment: Alignment.centerRight,
+                                        child: ElevatedButton.icon(
+                                          onPressed:
+                                              isApplied
+                                                  ? null
+                                                  : () => _applyForJob(
+                                                    post.userId,
+                                                    post.postId,
+                                                  ),
+                                          icon: Icon(
+                                            Icons.send,
+                                            color: Colors.white,
+                                          ),
+                                          label: Text(
+                                            isApplied ? "Applied" : "Apply Now",
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor:
+                                                isApplied
+                                                    ? Colors.grey
+                                                    : Colors.green,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
+                                            ),
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal: 16,
+                                              vertical: 10,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                child: Text(
-                                  isApplied ? "Applied" : "Apply Now",
-                                ),
-                              ),
+                              ],
                             ),
                           ],
                         ),
