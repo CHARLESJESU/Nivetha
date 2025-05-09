@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:nivetha123/screens/user_data.dart';
 import 'package:nivetha123/screens/checkbox_animation_page.dart';
+import '../main.dart';
 import '../widgets/step_progress.dart';
 
 class Page5Summary extends StatefulWidget {
@@ -78,8 +79,11 @@ class _Page5SummaryState extends State<Page5Summary> {
       base64Image = await _convertImageToBase64(widget.userData.profileImage!);
     }
 
+    final userId = generatedUserId;
+    final sanitizedEmail = globalEmail.replaceAll('.', '_dot_');
+
     Map<String, dynamic> personalInfo = {
-      "userId": widget.userData.userId = generatedUserId,
+      "userId": userId,
       "name": widget.userData.name,
       "role": widget.userData.role,
       "gender": widget.userData.gender,
@@ -91,6 +95,7 @@ class _Page5SummaryState extends State<Page5Summary> {
       "city": widget.userData.city,
       "area": widget.userData.area,
       "address": widget.userData.address,
+      "email-id": globalEmail,
     };
 
     Map<String, dynamic> userDataMap = {
@@ -104,11 +109,17 @@ class _Page5SummaryState extends State<Page5Summary> {
       final userType =
           widget.userData.role == "Worker" ? "workers" : "jobproviders";
 
+      // Save user data
       await _database
           .child("users")
           .child(userType)
-          .child(generatedUserId)
+          .child(userId)
           .set(userDataMap);
+
+      // Save email lookup
+      await _database.child("email").child(sanitizedEmail).set(userId);
+
+      widget.userData.userId = userId;
 
       setState(() {
         _isLoading = false;
@@ -129,9 +140,12 @@ class _Page5SummaryState extends State<Page5Summary> {
         _isLoading = false;
       });
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to save data: $error')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to save data: $error'),
+          action: SnackBarAction(label: 'Retry', onPressed: _saveToFirebase),
+        ),
+      );
     }
   }
 
@@ -143,11 +157,7 @@ class _Page5SummaryState extends State<Page5Summary> {
         backgroundColor: Colors.blue,
         title: const Text(
           'Profile Overview',
-          style: TextStyle(
-            fontSize: 25,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
+          style: TextStyle(fontSize: 25, fontWeight: FontWeight.bold),
         ),
       ),
       body:
@@ -167,8 +177,7 @@ class _Page5SummaryState extends State<Page5Summary> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const Divider(),
-
+                    const Divider(thickness: 1.0, height: 30),
                     Center(
                       child: Column(
                         children: [
@@ -191,9 +200,7 @@ class _Page5SummaryState extends State<Page5Summary> {
                                       )
                                       : null,
                             ),
-                          if (widget.userData.role == 'Worker')
-                            const SizedBox(height: 12),
-
+                          const SizedBox(height: 12),
                           const Text(
                             'User ID',
                             style: TextStyle(
@@ -214,11 +221,15 @@ class _Page5SummaryState extends State<Page5Summary> {
                             ),
                             child:
                                 isUserIdLoading
-                                    ? const CircularProgressIndicator()
+                                    ? const SizedBox(
+                                      height: 25,
+                                      width: 25,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
                                     : Text(
-                                      generatedUserId.isNotEmpty
-                                          ? generatedUserId
-                                          : 'Generating...',
+                                      generatedUserId,
                                       style: const TextStyle(
                                         fontSize: 25,
                                         fontWeight: FontWeight.bold,
@@ -230,7 +241,6 @@ class _Page5SummaryState extends State<Page5Summary> {
                         ],
                       ),
                     ),
-
                     const SizedBox(height: 25),
                     const Text(
                       'Personal Information',
@@ -249,7 +259,6 @@ class _Page5SummaryState extends State<Page5Summary> {
                       widget.userData.dob?.toLocal().toString().split(' ')[0] ??
                           "Not Set",
                     ),
-
                     const SizedBox(height: 20),
                     const Text(
                       'Contact Details',
@@ -266,7 +275,6 @@ class _Page5SummaryState extends State<Page5Summary> {
                     _buildInfoRow('City:', widget.userData.city),
                     _buildInfoRow('Area:', widget.userData.area),
                     _buildInfoRow('Address:', widget.userData.address),
-
                     if (widget.userData.role == 'Worker') ...[
                       const SizedBox(height: 20),
                       const Text(
@@ -279,7 +287,6 @@ class _Page5SummaryState extends State<Page5Summary> {
                       const SizedBox(height: 10),
                       _buildInfoRow('Experience:', widget.userData.experience),
                     ],
-
                     const SizedBox(height: 20),
                     CheckboxListTile(
                       value: termsAccepted,
