@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:nivetha123/screens/user_data.dart';
 import 'package:nivetha123/screens/checkbox_animation_page.dart';
+import '../main.dart';
 import '../widgets/step_progress.dart';
 
 class Page5Summary extends StatefulWidget {
@@ -91,6 +92,7 @@ class _Page5SummaryState extends State<Page5Summary> {
       "city": widget.userData.city,
       "area": widget.userData.area,
       "address": widget.userData.address,
+      "email-id":globalEmail
     };
 
     Map<String, dynamic> userDataMap = {
