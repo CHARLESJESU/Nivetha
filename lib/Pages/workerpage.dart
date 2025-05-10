@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:get/get.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -9,6 +11,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../login/Login.dart';
 import '../screens/user_data.dart';
+
+import 'Backcontroll.dart';
 
 class Workerpage extends StatefulWidget {
   final UserData userData;
@@ -20,8 +24,12 @@ class Workerpage extends StatefulWidget {
 
 class _WorkerpageState extends State<Workerpage> {
   late UserData userData;
+
   int _backPressCounter = 0;
   DateTime? _lastBackPressed;
+
+
+
   List<Post> posts = [];
   bool isLoading = true;
   Map<String, bool> appliedJobs = {};
@@ -74,7 +82,7 @@ class _WorkerpageState extends State<Workerpage> {
       setState(() => isLoading = false);
     }
   }
-
+  //
   Future<void> _pickImage() async {
     final picker = ImagePicker();
     final XFile? image = await showModalBottomSheet<XFile?>(
@@ -110,6 +118,7 @@ class _WorkerpageState extends State<Workerpage> {
     if (image != null) setState(() => userData.profileImage = image.path);
   }
 
+
   Future<bool> _onWillPop() async {
     DateTime now = DateTime.now();
     if (_lastBackPressed == null ||
@@ -144,6 +153,7 @@ class _WorkerpageState extends State<Workerpage> {
       return Future.value(false);
     }
   }
+
 
   Future<void> _applyForJob(String jobProviderUserId, String postId) async {
     final user = FirebaseAuth.instance.currentUser;
@@ -189,8 +199,12 @@ class _WorkerpageState extends State<Workerpage> {
   @override
   Widget build(BuildContext context) {
     final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+
+    final BackButtonController backController = Get.put(BackButtonController());
+
+
     return WillPopScope(
-      onWillPop: _onWillPop,
+      onWillPop: backController.handleWillPop,
       child: Scaffold(
         key: _scaffoldKey,
         appBar: AppBar(
@@ -248,6 +262,7 @@ class _WorkerpageState extends State<Workerpage> {
                 leading: Icon(Icons.logout),
                 title: Text('Logout'),
                 onTap: () async {
+
                   bool? shouldLogout = await Get.dialog(
                     AlertDialog(
                       title: Text("Confirm Logout"),
@@ -270,8 +285,23 @@ class _WorkerpageState extends State<Workerpage> {
                     await prefs.setBool('isLoggedIn', false);
                     Get.offAll(() => LoginScreen());
                   }
+
+                  Get.defaultDialog(
+                    title: "Confirm Logout",
+                    middleText: "Are you sure you want to logout?",
+                    textCancel: "Cancel",
+                    textConfirm: "Confirm",
+                    onConfirm: () async {
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.setBool('isLoggedIn', false);
+                      Get.offAll(() => const LoginScreen());
+                    },
+                    onCancel: () {},
+                  );
+
                 },
               ),
+
               Divider(),
               Padding(
                 padding: const EdgeInsets.all(16.0),
@@ -480,3 +510,4 @@ class Post {
     required this.imageBase64,
   });
 }
+
