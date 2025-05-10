@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../authendication/authentication.dart';
+import '../main.dart';
 import '../screens/name_job.dart';
 import '../screens/user_data.dart';
 import 'signup.dart';
@@ -35,11 +36,13 @@ class _LoginScreenState extends State<LoginScreen> {
         password: passwordController.text,
       );
       if (res == "success") {
+        globalEmail = emailController.text;
         setState(() {
           isLoading = false;
           errorMessage = '';
         });
         Navigator.of(context).pushReplacement(
+
           MaterialPageRoute(
             builder: (context) => Page1NameRole(userData: UserData()),
           ),

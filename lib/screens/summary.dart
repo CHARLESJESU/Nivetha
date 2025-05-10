@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:nivetha123/screens/user_data.dart';
 import 'package:nivetha123/screens/checkbox_animation_page.dart';
+import '../main.dart';
 import '../widgets/step_progress.dart';
 
 class Page5Summary extends StatefulWidget {
@@ -91,6 +92,7 @@ class _Page5SummaryState extends State<Page5Summary> {
       "city": widget.userData.city,
       "area": widget.userData.area,
       "address": widget.userData.address,
+      "email-id":globalEmail
     };
 
     Map<String, dynamic> userDataMap = {
@@ -99,16 +101,31 @@ class _Page5SummaryState extends State<Page5Summary> {
           widget.userData.role == 'Worker' ? widget.userData.experience : "N/A",
       "profileImageBase64": base64Image ?? "No Image",
     };
+    Map<String, dynamic> emailDataMap = {
+      "${globalEmail}": generatedUserId,
 
+
+    };
     try {
       final userType =
           widget.userData.role == "Worker" ? "workers" : "jobproviders";
-
       await _database
           .child("users")
           .child(userType)
           .child(generatedUserId)
           .set(userDataMap);
+
+      // Step 2: Sanitize email for Firebase key (replace "." with "_dot_")
+
+
+      // Step 3: Write to email/ path
+      await _database
+          .child("email")
+          .child(globalEmail)
+          .set(generatedUserId);
+
+
+
 
       setState(() {
         _isLoading = false;
