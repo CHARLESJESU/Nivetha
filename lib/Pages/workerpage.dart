@@ -30,6 +30,7 @@ class _WorkerpageState extends State<Workerpage> {
 
 
 
+
   List<Post> posts = [];
   bool isLoading = true;
   Map<String, bool> appliedJobs = {};
@@ -201,6 +202,7 @@ class _WorkerpageState extends State<Workerpage> {
     final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
     final BackButtonController backController = Get.put(BackButtonController());
+
 
 
     return WillPopScope(

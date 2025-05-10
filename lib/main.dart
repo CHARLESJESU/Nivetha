@@ -7,7 +7,6 @@ import 'package:nivetha123/Splashscreen/splashscreen.dart';
 
 import 'login/Login.dart';
 
-//nk7....
 String globalEmail = '';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();

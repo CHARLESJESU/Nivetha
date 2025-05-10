@@ -96,7 +96,9 @@ class _Page5SummaryState extends State<Page5Summary> {
       "area": widget.userData.area,
       "address": widget.userData.address,
 
-      "email-id": globalEmail,
+      "email-id":globalEmail
+
+
 
     };
 
@@ -109,13 +111,10 @@ class _Page5SummaryState extends State<Page5Summary> {
     Map<String, dynamic> emailDataMap = {
       "${globalEmail}": generatedUserId,
 
-
     };
     try {
       final userType =
           widget.userData.role == "Worker" ? "workers" : "jobproviders";
-
-      // Save user data
 
       await _database
           .child("users")
@@ -123,19 +122,18 @@ class _Page5SummaryState extends State<Page5Summary> {
           .child(userId)
           .set(userDataMap);
 
+
       // Save email lookup
       await _database.child("email").child(sanitizedEmail).set(userId);
 
       widget.userData.userId = userId;
 
+
       // Step 2: Sanitize email for Firebase key (replace "." with "_dot_")
 
 
       // Step 3: Write to email/ path
-      await _database
-          .child("email")
-          .child(globalEmail)
-          .set(generatedUserId);
+
 
 
 
