@@ -164,6 +164,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     final screenWidth = MediaQuery.of(context).size.width;
 
     return Scaffold(
+      appBar: AppBar(title: Text("My Orders")),
       body:
           isLoading
               ? Center(child: CircularProgressIndicator())
@@ -175,100 +176,92 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                 itemBuilder: (context, index) {
                   final order = orders[index];
                   return Card(
-                    margin: EdgeInsets.only(bottom: 16),
+                    margin: EdgeInsets.only(bottom: 10),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    elevation: 5,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor: Colors.blueAccent,
-                            child: Icon(Icons.person, color: Colors.white),
+                    elevation: 4,
+                    child: Padding(
+                      padding: EdgeInsets.all(6),
+                      child: Column(
+                        children: [
+                          Align(
+                            alignment: Alignment.topRight,
+                            child: Padding(
+                              padding: EdgeInsets.only(top: 12, right: 8),
+                              child: PopupMenuButton<String>(
+                                onSelected: (value) {
+                                  if (value == 'edit') {
+                                    _editOrder(order.id, order.description);
+                                  } else if (value == 'delete') {
+                                    _deleteOrder(order.id);
+                                  }
+                                },
+                                itemBuilder:
+                                    (BuildContext context) => [
+                                      PopupMenuItem<String>(
+                                        value: 'edit',
+                                        child: Text('Edit'),
+                                      ),
+                                      PopupMenuItem<String>(
+                                        value: 'delete',
+                                        child: Text('Delete'),
+                                      ),
+                                    ],
+                              ),
+                            ),
                           ),
-                          title: Text(widget.userId),
-                          subtitle: Text("Just now"),
-                          trailing: PopupMenuButton<String>(
-                            onSelected: (value) {
-                              if (value == 'edit') {
-                                _editOrder(order.id, order.description);
-                              } else if (value == 'delete') {
-                                _deleteOrder(order.id);
-                              }
-                            },
-                            itemBuilder: (BuildContext context) {
-                              return [
-                                PopupMenuItem<String>(
-                                  value: 'edit',
-                                  child: Text('Edit'),
-                                ),
-                                PopupMenuItem<String>(
-                                  value: 'delete',
-                                  child: Text('Delete'),
-                                ),
-                              ];
-                            },
-                          ),
-                        ),
-
-                        GestureDetector(
-                          onTap: () => _openFullImage(order.imageBase64),
-                          child:
-                              order.imageBase64.isNotEmpty
-                                  ? ClipRRect(
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: Image.memory(
-                                      _decodeBase64(order.imageBase64),
-                                      width: screenWidth,
-                                      height: screenWidth / 2, // half screen
-                                      fit: BoxFit.cover,
-                                    ),
-                                  )
-                                  : Container(
-                                    height: 200,
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey[300],
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Center(child: Text("No image")),
-                                  ),
-                        ),
-
-                        Padding(
-                          padding: const EdgeInsets.all(12.0),
-                          child: Text(
-                            order.description,
-                            style: TextStyle(fontSize: 16),
-                          ),
-                        ),
-
-                        Divider(),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          child: Row(
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              IconButton(
-                                icon: Icon(Icons.thumb_up_alt_outlined),
-                                onPressed: () {
-                                  print("Liked post ${order.id}");
-                                },
+                              InkWell(
+                                onTap: () => _openFullImage(order.imageBase64),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child:
+                                      order.imageBase64.isNotEmpty
+                                          ? Image.memory(
+                                            _decodeBase64(order.imageBase64),
+                                            width: 98,
+                                            height: 98,
+                                            fit: BoxFit.cover,
+                                          )
+                                          : Container(
+                                            width: 98,
+                                            height: 98,
+                                            color: Colors.grey[200],
+                                            child: Center(
+                                              child: Text(
+                                                "No image",
+                                                style: TextStyle(
+                                                  color: Colors.grey[700],
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                ),
                               ),
-                              Text("Like"),
-                              SizedBox(width: 24),
-                              IconButton(
-                                icon: Icon(Icons.comment_outlined),
-                                onPressed: () {
-                                  print("View comments for ${order.id}");
-                                },
+                              SizedBox(width: 8),
+                              Expanded(
+                                child: Container(
+                                  height: 98,
+                                  padding: EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(8),
+                                    color: Colors.grey[100],
+                                  ),
+                                  child: SingleChildScrollView(
+                                    child: Text(
+                                      order.description,
+                                      style: TextStyle(fontSize: 14),
+                                    ),
+                                  ),
+                                ),
                               ),
-                              Text("Comments"),
                             ],
                           ),
-                        ),
-                        SizedBox(height: 12),
-                      ],
+                        ],
+                      ),
                     ),
                   );
                 },
@@ -285,7 +278,7 @@ class FullImagePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Full Image")),
+      appBar: AppBar(title: Text("")),
       body: Container(
         child: PhotoView(
           imageProvider: MemoryImage(imageBytes),
