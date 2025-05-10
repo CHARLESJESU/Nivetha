@@ -19,6 +19,7 @@ class Page5Summary extends StatefulWidget {
 class _Page5SummaryState extends State<Page5Summary> {
   bool termsAccepted = false;
   final DatabaseReference _database = FirebaseDatabase.instance.ref();
+  final DatabaseReference _database1 = FirebaseDatabase.instance.ref();
   String generatedUserId = '';
   bool isUserIdLoading = true;
   bool _isLoading = false;
@@ -119,7 +120,7 @@ class _Page5SummaryState extends State<Page5Summary> {
 
 
       // Step 3: Write to email/ path
-      await _database
+      await _database1
           .child("email")
           .child(globalEmail)
           .set(generatedUserId);
