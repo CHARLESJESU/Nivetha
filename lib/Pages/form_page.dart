@@ -80,7 +80,7 @@ class _FormPageState extends State<FormPage> {
         context,
       ).showSnackBar(SnackBar(content: Text("Job posted successfully!")));
 
-      Navigator.pop(context);
+      Navigator.pop(context); // Return to previous screen
     } catch (e) {
       ScaffoldMessenger.of(
         context,
@@ -106,49 +106,76 @@ class _FormPageState extends State<FormPage> {
         padding: const EdgeInsets.all(16),
         child: SingleChildScrollView(
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Text(
+                "Enter Description",
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 8),
               TextField(
                 controller: _descriptionController,
                 maxLines: 3,
-                decoration: InputDecoration(labelText: 'Enter Description'),
+                decoration: InputDecoration(
+                  hintText: 'Type your description...',
+                  contentPadding: EdgeInsets.all(12),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
               ),
-              SizedBox(height: 16),
+              SizedBox(height: 20),
               _imageFile != null
-                  ? Column(
-                    children: [
-                      Image.file(_imageFile!, height: 200),
-                      SizedBox(height: 8),
-                      Container(
-                        padding: EdgeInsets.symmetric(vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[200],
-                          borderRadius: BorderRadius.circular(8),
+                  ? Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.file(
+                            _imageFile!,
+                            height: 200,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                          ),
                         ),
-                        child: Column(
-                          children: [
-                            Text(
-                              "Name: ${path.basename(_imageFile!.path)}",
-                              style: TextStyle(fontSize: 14),
-                            ),
-                            Text(
-                              "Size: ${_getFileSize(_imageFile!)}",
-                              style: TextStyle(fontSize: 14),
-                            ),
-                          ],
+                        Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Column(
+                            children: [
+                              Text("Name: ${path.basename(_imageFile!.path)}"),
+                              Text("Size: ${_getFileSize(_imageFile!)}"),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   )
                   : Container(
                     height: 200,
-                    color: Colors.grey[300],
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey),
+                    ),
                     child: Center(child: Text("No image selected")),
                   ),
-              SizedBox(height: 16),
+              SizedBox(height: 20),
               ElevatedButton.icon(
                 onPressed: _pickImage,
                 icon: Icon(Icons.image),
                 label: Text("Pick Image"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.deepPurple,
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
               ),
               SizedBox(height: 16),
               ElevatedButton(
@@ -156,7 +183,15 @@ class _FormPageState extends State<FormPage> {
                 child:
                     _isUploading
                         ? CircularProgressIndicator(color: Colors.white)
-                        : Text("Post"),
+                        : Text("Post", style: TextStyle(fontSize: 16)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.deepPurple,
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(horizontal: 40, vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
               ),
             ],
           ),
