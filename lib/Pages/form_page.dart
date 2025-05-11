@@ -68,6 +68,7 @@ class _FormPageState extends State<FormPage> {
 
     try {
       final userId = widget.userId;
+
       final base64Image = await _convertImageToBase64(_imageFile!);
 
       await _dbRef.child(userId).push().set({
@@ -117,13 +118,24 @@ class _FormPageState extends State<FormPage> {
                     children: [
                       Image.file(_imageFile!, height: 200),
                       SizedBox(height: 8),
-                      Text(
-                        'File: ${path.basename(_imageFile!.path)}',
-                        style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-                      ),
-                      Text(
-                        'Size: ${_getFileSize(_imageFile!)}',
-                        style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                      Container(
+                        padding: EdgeInsets.symmetric(vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[200],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Column(
+                          children: [
+                            Text(
+                              "Name: ${path.basename(_imageFile!.path)}",
+                              style: TextStyle(fontSize: 14),
+                            ),
+                            Text(
+                              "Size: ${_getFileSize(_imageFile!)}",
+                              style: TextStyle(fontSize: 14),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   )
