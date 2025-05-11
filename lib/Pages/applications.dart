@@ -62,107 +62,104 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
   Widget _buildWorkerCard(Map<String, dynamic> data, int index) {
     return Card(
       margin: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header: User ID + Name
+            // Top Row: ID + Name + More Details
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Flexible(
-                  child: Text(
-                    "User ID: ${data['userId']}",
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "User ID: ${data['userId']}",
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        "Name: ${data['name']}",
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                SizedBox(width: 12),
-                Flexible(
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      showDetails[index] = !showDetails[index];
+                    });
+                  },
                   child: Text(
-                    "Name: ${data['name']}",
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    showDetails[index] ? "Hide details" : "More details",
+                    style: TextStyle(color: Colors.blue, fontSize: 14),
                   ),
                 ),
               ],
             ),
-            SizedBox(height: 8),
 
-            // Accept / Reject Buttons
+            SizedBox(height: 10),
+
+            // Expanded Details
+            if (showDetails[index])
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _detailText("Experience", data['experience']),
+                  _detailText("Role", data['role']),
+                  _detailText("Gender", data['gender']),
+                  _detailText("DOB", data['dob']),
+                  _detailText("Country", data['country']),
+                  _detailText("State", data['state']),
+                  _detailText("District", data['district']),
+                  _detailText("City", data['city']),
+                  _detailText("Area", data['area']),
+                  _detailText("Address", data['address']),
+                  SizedBox(height: 8),
+                ],
+              ),
+
+            // Accept/Reject Buttons
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                ElevatedButton(
-                  onPressed: () {},
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {},
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
+                    child: Text("Accept"),
                   ),
-                  child: Text("Accept"),
                 ),
-                SizedBox(width: 16),
-                ElevatedButton(
-                  onPressed: () {},
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+                SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {},
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
+                    child: Text("Reject"),
                   ),
-                  child: Text("Reject"),
                 ),
               ],
             ),
-
-            // Expandable Details
-            SizedBox(height: 12),
-            GestureDetector(
-              onTap: () {
-                setState(() {
-                  showDetails[index] = !showDetails[index];
-                });
-              },
-              child: Align(
-                alignment: Alignment.centerRight,
-                child: Text(
-                  showDetails[index] ? "Hide Details" : "More Details",
-                  style: TextStyle(
-                    color: Colors.blue,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ),
-            if (showDetails[index])
-              Container(
-                margin: EdgeInsets.only(top: 12),
-                padding: EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.grey[800],
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _detailText("Phone", data['phoneNumber']),
-                    _detailText("Experience", data['experience']),
-                    _detailText("Role", data['role']),
-                    _detailText("Gender", data['gender']),
-                    _detailText("DOB", data['dob']),
-                    _detailText("Country", data['country']),
-                    _detailText("State", data['state']),
-                    _detailText("District", data['district']),
-                    _detailText("City", data['city']),
-                    _detailText("Area", data['area']),
-                    _detailText("Address", data['address']),
-                  ],
-                ),
-              ),
           ],
         ),
       ),
@@ -171,10 +168,10 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
 
   Widget _detailText(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
+      padding: const EdgeInsets.symmetric(vertical: 1),
       child: Text(
         "$label: $value",
-        style: TextStyle(color: Colors.white, fontSize: 12),
+        style: TextStyle(fontSize: 13, color: Colors.black87),
       ),
     );
   }
