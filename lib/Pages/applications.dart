@@ -61,7 +61,7 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
 
   Widget _buildWorkerCard(Map<String, dynamic> data, int index) {
     return SizedBox(
-      height: 144, // approx. 2 inches on standard 72dpi screen
+      height: 144, // Equal card height (~2 inches)
       child: Card(
         margin: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         elevation: 3,
@@ -71,45 +71,15 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Top Row: ID + Name + More Details
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Flexible(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "User ID: ${data['userId']}",
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          "Name: ${data['name']}",
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        showDetails[index] = !showDetails[index];
-                      });
-                    },
-                    child: Text(
-                      showDetails[index] ? "Hide details" : "More details",
-                      style: TextStyle(color: Colors.blue, fontSize: 14),
-                    ),
-                  ),
-                ],
+              // ID and Name
+              Text(
+                "User ID: ${data['userId']}",
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
               ),
-
+              Text(
+                "Name: ${data['name']}",
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+              ),
               SizedBox(height: 6),
 
               // Expanded Details
@@ -129,43 +99,60 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
                         _detailText("City", data['city']),
                         _detailText("Area", data['area']),
                         _detailText("Address", data['address']),
-                        SizedBox(height: 8),
-                        // Vertical Accept/Reject Buttons
-                        Column(
-                          children: [
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton(
-                                onPressed: () {},
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.green,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                                child: Text("Accept"),
-                              ),
-                            ),
-                            SizedBox(height: 8),
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton(
-                                onPressed: () {},
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.red,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                                child: Text("Reject"),
-                              ),
-                            ),
-                          ],
-                        ),
                       ],
                     ),
                   ),
                 ),
+
+              // More details button at the bottom
+              Align(
+                alignment: Alignment.centerRight,
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      showDetails[index] = !showDetails[index];
+                    });
+                  },
+                  child: Text(
+                    showDetails[index] ? "Hide details" : "More details",
+                    style: TextStyle(color: Colors.blue, fontSize: 14),
+                  ),
+                ),
+              ),
+
+              SizedBox(height: 6),
+
+              // Accept/Reject Buttons
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {},
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: Text("Accept"),
+                    ),
+                  ),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {},
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: Text("Reject"),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
