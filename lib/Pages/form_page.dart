@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path/path.dart' as path;
 
 class FormPage extends StatefulWidget {
   final String userId;
@@ -67,10 +68,8 @@ class _FormPageState extends State<FormPage> {
 
     try {
       final userId = widget.userId;
-
       final base64Image = await _convertImageToBase64(_imageFile!);
 
-      // ✅ Save multiple jobs using .push()
       await _dbRef.child(userId).push().set({
         'description': _descriptionController.text,
         'imageBase64': base64Image,
@@ -80,7 +79,7 @@ class _FormPageState extends State<FormPage> {
         context,
       ).showSnackBar(SnackBar(content: Text("Job posted successfully!")));
 
-      Navigator.pop(context); // Return to previous screen
+      Navigator.pop(context);
     } catch (e) {
       ScaffoldMessenger.of(
         context,
@@ -90,6 +89,12 @@ class _FormPageState extends State<FormPage> {
         _isUploading = false;
       });
     }
+  }
+
+  String _getFileSize(File file) {
+    final bytes = file.lengthSync();
+    final kb = bytes / 1024;
+    return kb.toStringAsFixed(2) + ' KB';
   }
 
   @override
@@ -108,7 +113,20 @@ class _FormPageState extends State<FormPage> {
               ),
               SizedBox(height: 16),
               _imageFile != null
-                  ? Image.file(_imageFile!, height: 200)
+                  ? Column(
+                    children: [
+                      Image.file(_imageFile!, height: 200),
+                      SizedBox(height: 8),
+                      Text(
+                        'File: ${path.basename(_imageFile!.path)}',
+                        style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                      ),
+                      Text(
+                        'Size: ${_getFileSize(_imageFile!)}',
+                        style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                      ),
+                    ],
+                  )
                   : Container(
                     height: 200,
                     color: Colors.grey[300],
