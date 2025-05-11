@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path/path.dart' as path;
 
 class FormPage extends StatefulWidget {
   final String userId;
@@ -80,7 +79,7 @@ class _FormPageState extends State<FormPage> {
         context,
       ).showSnackBar(SnackBar(content: Text("Job posted successfully!")));
 
-      Navigator.pop(context); // Return to previous screen
+      Navigator.pop(context);
     } catch (e) {
       ScaffoldMessenger.of(
         context,
@@ -90,12 +89,6 @@ class _FormPageState extends State<FormPage> {
         _isUploading = false;
       });
     }
-  }
-
-  String _getFileSize(File file) {
-    final bytes = file.lengthSync();
-    final kb = bytes / 1024;
-    return kb.toStringAsFixed(2) + ' KB';
   }
 
   @override
@@ -113,45 +106,36 @@ class _FormPageState extends State<FormPage> {
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
               SizedBox(height: 8),
-              TextField(
-                controller: _descriptionController,
-                maxLines: 3,
-                decoration: InputDecoration(
-                  hintText: 'Type your description...',
-                  contentPadding: EdgeInsets.all(12),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+              Container(
+                height: 100, // approx 3 inches
+                child: TextField(
+                  controller: _descriptionController,
+                  maxLines: null,
+                  expands: true,
+                  decoration: InputDecoration(
+                    hintText: 'Type your description...',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    contentPadding: EdgeInsets.all(12),
                   ),
                 ),
               ),
               SizedBox(height: 20),
               _imageFile != null
                   ? Container(
+                    height: 200,
                     decoration: BoxDecoration(
                       border: Border.all(color: Colors.grey),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Column(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Image.file(
-                            _imageFile!,
-                            height: 200,
-                            width: double.infinity,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: Column(
-                            children: [
-                              Text("Name: ${path.basename(_imageFile!.path)}"),
-                              Text("Size: ${_getFileSize(_imageFile!)}"),
-                            ],
-                          ),
-                        ),
-                      ],
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.file(
+                        _imageFile!,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                      ),
                     ),
                   )
                   : Container(
@@ -164,32 +148,32 @@ class _FormPageState extends State<FormPage> {
                     child: Center(child: Text("No image selected")),
                   ),
               SizedBox(height: 20),
-              ElevatedButton.icon(
-                onPressed: _pickImage,
-                icon: Icon(Icons.image),
-                label: Text("Pick Image"),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.deepPurple,
-                  foregroundColor: Colors.white,
-                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+              Center(
+                child: ElevatedButton.icon(
+                  onPressed: _pickImage,
+                  icon: Icon(Icons.image),
+                  label: Text("Pick Image"),
+                  style: ElevatedButton.styleFrom(
+                    padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                 ),
               ),
               SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: _isUploading ? null : _uploadOrder,
-                child:
-                    _isUploading
-                        ? CircularProgressIndicator(color: Colors.white)
-                        : Text("Post", style: TextStyle(fontSize: 16)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.deepPurple,
-                  foregroundColor: Colors.white,
-                  padding: EdgeInsets.symmetric(horizontal: 40, vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+              Center(
+                child: ElevatedButton(
+                  onPressed: _isUploading ? null : _uploadOrder,
+                  child:
+                      _isUploading
+                          ? CircularProgressIndicator(color: Colors.white)
+                          : Text("Post"),
+                  style: ElevatedButton.styleFrom(
+                    padding: EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                 ),
               ),
