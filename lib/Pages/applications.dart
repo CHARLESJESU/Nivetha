@@ -12,6 +12,7 @@ class ApplicationsPage extends StatefulWidget {
 
 class _ApplicationsPageState extends State<ApplicationsPage> {
   List<Map<String, dynamic>> applications = [];
+  List<bool> showDetails = [];
 
   @override
   void initState() {
@@ -53,13 +54,14 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
 
       setState(() {
         applications = fetchedApps;
+        showDetails = List.generate(fetchedApps.length, (_) => false);
       });
     }
   }
 
-  Widget _buildWorkerCard(Map<String, dynamic> data) {
+  Widget _buildWorkerCard(Map<String, dynamic> data, int index) {
     return Card(
-      margin: EdgeInsets.all(12),
+      margin: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
@@ -67,25 +69,112 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              "User ID: ${data['userId']}",
-              style: TextStyle(fontWeight: FontWeight.bold),
+            // Header: User ID + Name
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Flexible(
+                  child: Text(
+                    "User ID: ${data['userId']}",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                ),
+                SizedBox(width: 12),
+                Flexible(
+                  child: Text(
+                    "Name: ${data['name']}",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                ),
+              ],
             ),
-            SizedBox(height: 4),
-            Text("Name: ${data['name']}"),
-            Text("Phone: ${data['phoneNumber']}"),
-            Text("Experience: ${data['experience']}"),
-            Text("Role: ${data['role']}"),
-            Text("Gender: ${data['gender']}"),
-            Text("DOB: ${data['dob']}"),
-            Text("Country: ${data['country']}"),
-            Text("State: ${data['state']}"),
-            Text("District: ${data['district']}"),
-            Text("City: ${data['city']}"),
-            Text("Area: ${data['area']}"),
-            Text("Address: ${data['address']}"),
+            SizedBox(height: 8),
+
+            // Accept / Reject Buttons
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ElevatedButton(
+                  onPressed: () {},
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: Text("Accept"),
+                ),
+                SizedBox(width: 16),
+                ElevatedButton(
+                  onPressed: () {},
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: Text("Reject"),
+                ),
+              ],
+            ),
+
+            // Expandable Details
+            SizedBox(height: 12),
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  showDetails[index] = !showDetails[index];
+                });
+              },
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  showDetails[index] ? "Hide Details" : "More Details",
+                  style: TextStyle(
+                    color: Colors.blue,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ),
+            if (showDetails[index])
+              Container(
+                margin: EdgeInsets.only(top: 12),
+                padding: EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.grey[800],
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _detailText("Phone", data['phoneNumber']),
+                    _detailText("Experience", data['experience']),
+                    _detailText("Role", data['role']),
+                    _detailText("Gender", data['gender']),
+                    _detailText("DOB", data['dob']),
+                    _detailText("Country", data['country']),
+                    _detailText("State", data['state']),
+                    _detailText("District", data['district']),
+                    _detailText("City", data['city']),
+                    _detailText("Area", data['area']),
+                    _detailText("Address", data['address']),
+                  ],
+                ),
+              ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _detailText(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Text(
+        "$label: $value",
+        style: TextStyle(color: Colors.white, fontSize: 12),
       ),
     );
   }
@@ -100,7 +189,7 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
               : ListView.builder(
                 itemCount: applications.length,
                 itemBuilder: (context, index) {
-                  return _buildWorkerCard(applications[index]);
+                  return _buildWorkerCard(applications[index], index);
                 },
               ),
     );
