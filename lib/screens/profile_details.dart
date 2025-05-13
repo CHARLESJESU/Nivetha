@@ -51,12 +51,16 @@ class _Page4ProfileDetailsState extends State<Page4ProfileDetails> {
 
   @override
   Widget build(BuildContext context) {
+    String nameInitial =
+        widget.userData.name.isNotEmpty
+            ? widget.userData.name[0].toUpperCase()
+            : '';
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
         automaticallyImplyLeading: false,
         title: Text(
-          'Profile Info',
+          '$nameInitial Profile',
           style: TextStyle(
             fontSize: 25,
             fontWeight: FontWeight.bold,
