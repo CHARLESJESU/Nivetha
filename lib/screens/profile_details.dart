@@ -32,13 +32,6 @@ class _Page4ProfileDetailsState extends State<Page4ProfileDetails> {
   }
 
   void _validateAndProceed() {
-    if (_image == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Please upload a profile picture!')),
-      );
-      return;
-    }
-
     if (experienceController.text.isEmpty) {
       setState(() {
         errorMessage = "Please enter your years of experience.";
@@ -81,7 +74,6 @@ class _Page4ProfileDetailsState extends State<Page4ProfileDetails> {
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   StepProgress(currentStep: 4, totalSteps: 5),
-
                   SizedBox(height: 30),
 
                   // 📸 Profile Picture Upload
@@ -93,13 +85,10 @@ class _Page4ProfileDetailsState extends State<Page4ProfileDetails> {
                   GestureDetector(
                     onTap: _pickImage,
                     child: Container(
-                      padding: EdgeInsets.all(4), // Border thickness
+                      padding: EdgeInsets.all(4),
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.black,
-                          width: 1,
-                        ), // Black border
+                        border: Border.all(color: Colors.black, width: 1),
                       ),
                       child: CircleAvatar(
                         radius: 65,
@@ -139,10 +128,7 @@ class _Page4ProfileDetailsState extends State<Page4ProfileDetails> {
                       filled: true,
                       fillColor: Colors.grey[200],
                       border: OutlineInputBorder(
-                        borderSide: BorderSide(
-                          color: Colors.black,
-                          width: 2,
-                        ), // Black border
+                        borderSide: BorderSide(color: Colors.black, width: 2),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       contentPadding: EdgeInsets.symmetric(
