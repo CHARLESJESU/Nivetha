@@ -1,5 +1,9 @@
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+import 'package:nivetha123/Pages/newonefortest.dart';
 
+import '../Pages/jobproviderpage.dart';
+import '../Pages/workerpage.dart';
 import '../authendication/authentication.dart';
 import '../main.dart';
 import '../screens/name_job.dart';
@@ -17,6 +21,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
+  final DatabaseReference _database = FirebaseDatabase.instance.ref();
   final _formKey = GlobalKey<FormState>();
   bool isLoading = false;
   String errorMessage = ''; // Store error message here
@@ -35,7 +40,13 @@ class _LoginScreenState extends State<LoginScreen> {
         email: emailController.text,
         password: passwordController.text,
       );
-      if (res == "success") {
+      String userexist = await AuthServicews().existUser(
+        email: emailController.text,
+        password: passwordController.text,
+      );
+      String userType;
+    if (res == "success" && userexist=="not_existuser") {
+      // if (res == "success") {
         globalEmail = emailController.text;
         setState(() {
           isLoading = false;
@@ -47,7 +58,37 @@ class _LoginScreenState extends State<LoginScreen> {
             builder: (context) => Page1NameRole(userData: UserData()),
           ),
         );
-      } else {
+      }
+      else if(res == "success"){
+        setState(() {
+          isLoading = false;
+          errorMessage = '';
+        });
+        if (userexist.startsWith("JO")) {
+          userType = "jobproviders";
+        } else {
+          userType = "workers";
+        }
+        final snapshot = await _database.child("users").child(userType).child(userexist).get();
+        final data = Map<String, dynamic>.from(snapshot.value as Map); // Ensure correct type
+        final userData = UserData.fromJson(data);
+        // Navigator.of(context).pushReplacement(
+        //
+        //   MaterialPageRoute(
+        //     builder: (context) => Hida(userexist: userType),
+        //   ),
+        // );
+        Widget nextPage =
+        userType == 'workers'
+            ? Workerpage(userData: userData)
+            : Jobproviderpage(userData: userData);
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => nextPage),
+        );
+      }
+      else {
         setState(() {
           isLoading = false;
           errorMessage =

@@ -82,7 +82,7 @@ class _Page5SummaryState extends State<Page5Summary> {
     final userId = generatedUserId;
     final sanitizedEmail = globalEmail.replaceAll('.', '_dot_');
 
-    Map<String, dynamic> personalInfo = {
+    Map<String, dynamic> userDataMap = {
       "userId": userId,
       "name": widget.userData.name,
       "role": widget.userData.role,
@@ -95,19 +95,21 @@ class _Page5SummaryState extends State<Page5Summary> {
       "city": widget.userData.city,
       "area": widget.userData.area,
       "address": widget.userData.address,
-
-      "email-id":globalEmail
-
-
-
-    };
-
-    Map<String, dynamic> userDataMap = {
-      "personalInformation": personalInfo,
       "experience":
-          widget.userData.role == 'Worker' ? widget.userData.experience : "N/A",
+      widget.userData.role == 'Worker' ? widget.userData.experience : "N/A",
+      "email-id":globalEmail,
       "profileImageBase64": base64Image ?? "No Image",
+
+
+
     };
+
+    // Map<String, dynamic> userDataMap = {
+    //   "personalInformation": personalInfo,
+    //   "experience":
+    //       widget.userData.role == 'Worker' ? widget.userData.experience : "N/A",
+    //   "profileImageBase64": base64Image ?? "No Image",
+    // };
     Map<String, dynamic> emailDataMap = {
       "${globalEmail}": generatedUserId,
 
@@ -122,20 +124,9 @@ class _Page5SummaryState extends State<Page5Summary> {
           .child(userId)
           .set(userDataMap);
 
-
-      // Save email lookup
       await _database.child("email").child(sanitizedEmail).set(userId);
 
       widget.userData.userId = userId;
-
-
-      // Step 2: Sanitize email for Firebase key (replace "." with "_dot_")
-
-
-      // Step 3: Write to email/ path
-
-
-
 
 
 
