@@ -69,41 +69,17 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Top Row: ID + Name + More Details
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            // Top: ID + Name
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Flexible(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "User ID: ${data['userId']}",
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        "Name: ${data['name']}",
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
+                Text(
+                  "User ID: ${data['userId']}",
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                 ),
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      showDetails[index] = !showDetails[index];
-                    });
-                  },
-                  child: Text(
-                    showDetails[index] ? "Hide details" : "More details",
-                    style: TextStyle(color: Colors.blue, fontSize: 14),
-                  ),
+                Text(
+                  "Name: ${data['name']}",
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                 ),
               ],
             ),
@@ -129,36 +105,56 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
                 ],
               ),
 
-            // Accept/Reject Buttons
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {},
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+            // Accept/Reject Buttons only visible when details are expanded
+            if (showDetails[index])
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {},
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
+                      child: Text("Accept"),
                     ),
-                    child: Text("Accept"),
+                  ),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {},
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: Text("Reject"),
+                    ),
+                  ),
+                ],
+              ),
+
+            // More Details moved to bottom
+            Align(
+              alignment: Alignment.centerRight,
+              child: GestureDetector(
+                onTap: () {
+                  setState(() {
+                    showDetails[index] = !showDetails[index];
+                  });
+                },
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    showDetails[index] ? "Hide details" : "More details",
+                    style: TextStyle(color: Colors.blue, fontSize: 14),
                   ),
                 ),
-                SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {},
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: Text("Reject"),
-                  ),
-                ),
-              ],
+              ),
             ),
           ],
         ),
