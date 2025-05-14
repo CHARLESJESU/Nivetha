@@ -476,13 +476,23 @@ class _WorkerpageState extends State<Workerpage> {
     );
   }
 
-  Widget _buildProfileAvatar({required double radius}) => CircleAvatar(
-    backgroundImage:
-        userData.profileImage != null && userData.profileImage!.isNotEmpty
-            ? FileImage(File(userData.profileImage!))
-            : AssetImage('assets/default_profile.png') as ImageProvider,
-    radius: radius,
-  );
+  Widget _buildProfileAvatar({required double radius}) {
+    if (userData.profileImage != null && userData.profileImage!.isNotEmpty) {
+      return CircleAvatar(
+        backgroundImage: FileImage(File(userData.profileImage!)),
+        radius: radius,
+      );
+    }
+
+    return CircleAvatar(
+      backgroundColor: Colors.grey[300],
+      radius: radius,
+      child: Text(
+        userData.name.isNotEmpty ? userData.name[0].toUpperCase() : '?',
+        style: TextStyle(fontSize: radius, color: Colors.blue),
+      ),
+    );
+  }
 
   Widget _buildProfileDetail(String label, String value) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 16.0),

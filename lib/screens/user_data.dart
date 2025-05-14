@@ -46,7 +46,7 @@ class UserData {
       'city': city,
       'address': address,
       'area': area,
-      'phoneNumber': phoneNumber,
+      'phone': phoneNumber,
       'experience': experience,
       'profileImage': profileImage,
     };
@@ -66,7 +66,7 @@ class UserData {
       city: json['city'] ?? '',
       address: json['address'] ?? '',
       area: json['area'] ?? '',
-      phoneNumber: json['phoneNumber'] ?? '+91',
+      phoneNumber: json['phone'] ?? '+91',
       experience: json['experience'] ?? '',
       profileImage: json['profileImage'] ?? '',
     );
