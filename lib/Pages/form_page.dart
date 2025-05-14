@@ -100,33 +100,83 @@ class _FormPageState extends State<FormPage> {
         padding: const EdgeInsets.all(16),
         child: SingleChildScrollView(
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              TextField(
-                controller: _descriptionController,
-                maxLines: 3,
-                decoration: InputDecoration(labelText: 'Enter Description'),
+              Text(
+                "Enter Description",
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
-              SizedBox(height: 16),
-              _imageFile != null
-                  ? Image.file(_imageFile!, height: 200)
-                  : Container(
-                    height: 200,
-                    color: Colors.grey[300],
-                    child: Center(child: Text("No image selected")),
+              SizedBox(height: 8),
+              Container(
+                height: 100, // approx 3 inches
+                child: TextField(
+                  controller: _descriptionController,
+                  maxLines: null,
+                  expands: true,
+                  decoration: InputDecoration(
+                    hintText: 'Type your description...',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    contentPadding: EdgeInsets.all(12),
                   ),
-              SizedBox(height: 16),
-              ElevatedButton.icon(
-                onPressed: _pickImage,
-                icon: Icon(Icons.image),
-                label: Text("Pick Image"),
+                ),
+              ),
+              SizedBox(height: 20),
+              _imageFile != null
+                  ? Container(
+                height: 200,
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.file(
+                    _imageFile!,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              )
+                  : Container(
+                height: 200,
+                decoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey),
+                ),
+                child: Center(child: Text("No image selected")),
+              ),
+              SizedBox(height: 20),
+              Center(
+                child: ElevatedButton.icon(
+                  onPressed: _pickImage,
+                  icon: Icon(Icons.image),
+                  label: Text("Pick Image"),
+                  style: ElevatedButton.styleFrom(
+                    padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
               ),
               SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: _isUploading ? null : _uploadOrder,
-                child:
-                    _isUploading
-                        ? CircularProgressIndicator(color: Colors.white)
-                        : Text("Post"),
+              Center(
+                child: ElevatedButton(
+                  onPressed: _isUploading ? null : _uploadOrder,
+                  child:
+                  _isUploading
+                      ? CircularProgressIndicator(color: Colors.white)
+                      : Text("Post"),
+                  style: ElevatedButton.styleFrom(
+                    padding: EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
