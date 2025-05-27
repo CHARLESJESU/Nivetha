@@ -5,12 +5,14 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:photo_view/photo_view.dart';
 
 class Order {
-  final String id;
+  final String id; // Firebase key
+  final String orderId; // Your custom generated order ID
   final String description;
   final String imageBase64;
 
   Order({
     required this.id,
+    required this.orderId,
     required this.description,
     required this.imageBase64,
   });
@@ -53,6 +55,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
             fetchedOrders.add(
               Order(
                 id: key,
+                orderId: value['orderId']?.toString() ?? key,
                 description: value['description'] ?? '',
                 imageBase64: value['imageBase64'] ?? '',
               ),
@@ -75,7 +78,14 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     }
   }
 
-  Uint8List _decodeBase64(String base64String) => base64Decode(base64String);
+  Uint8List _decodeBase64(String base64String) {
+    try {
+      return base64Decode(base64String);
+    } catch (e) {
+      print("Base64 decoding failed: $e");
+      return Uint8List(0);
+    }
+  }
 
   void _openFullImage(String base64Image) {
     Navigator.push(
@@ -98,9 +108,9 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
       ).showSnackBar(SnackBar(content: Text("Deleted successfully")));
       _loadOrders();
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Failed to delete: $e")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Failed to delete: ${e.toString()}")),
+      );
     }
   }
 
@@ -122,7 +132,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text('Cancel'),
+              child: const Text('Cancel'),
             ),
             TextButton(
               onPressed: () async {
@@ -147,11 +157,13 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                   _loadOrders();
                 } catch (e) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text("Failed to update: $e")),
+                    SnackBar(
+                      content: Text("Failed to update: ${e.toString()}"),
+                    ),
                   );
                 }
               },
-              child: Text('Save'),
+              child: const Text('Save'),
             ),
           ],
         );
@@ -161,15 +173,25 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-
     return Scaffold(
       appBar: AppBar(title: Text("My Orders")),
       body:
           isLoading
               ? Center(child: CircularProgressIndicator())
               : orders.isEmpty
-              ? Center(child: Text("No orders posted yet."))
+              ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: const [
+                    Icon(Icons.inbox, size: 48, color: Colors.grey),
+                    SizedBox(height: 10),
+                    Text(
+                      "No orders posted yet.",
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                  ],
+                ),
+              )
               : ListView.builder(
                 padding: EdgeInsets.all(12),
                 itemCount: orders.length,
@@ -184,11 +206,26 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                     child: Padding(
                       padding: EdgeInsets.all(6),
                       child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          Padding(
+                            padding: const EdgeInsets.only(
+                              top: 10.0,
+                              left: 12.0,
+                            ),
+                            child: Text(
+                              "Order ID: ${order.orderId}", // 👈 custom ID
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                color: Colors.grey[700],
+                              ),
+                            ),
+                          ),
                           Align(
                             alignment: Alignment.topRight,
                             child: Padding(
-                              padding: EdgeInsets.only(top: 12, right: 8),
+                              padding: EdgeInsets.only(top: 0, right: 8),
                               child: PopupMenuButton<String>(
                                 onSelected: (value) {
                                   if (value == 'edit') {
@@ -278,14 +315,12 @@ class FullImagePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("")),
-      body: Container(
-        child: PhotoView(
-          imageProvider: MemoryImage(imageBytes),
-          backgroundDecoration: BoxDecoration(color: Colors.black),
-          minScale: PhotoViewComputedScale.contained,
-          maxScale: PhotoViewComputedScale.covered * 2,
-        ),
+      appBar: AppBar(title: Text("Full Image")),
+      body: PhotoView(
+        imageProvider: MemoryImage(imageBytes),
+        backgroundDecoration: BoxDecoration(color: Colors.black),
+        minScale: PhotoViewComputedScale.contained,
+        maxScale: PhotoViewComputedScale.covered * 2,
       ),
     );
   }
