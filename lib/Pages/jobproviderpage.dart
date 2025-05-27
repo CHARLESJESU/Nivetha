@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -36,6 +37,7 @@ class _JobproviderpageState extends State<Jobproviderpage> {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setBool('isLoggedIn', true);
     await prefs.setBool('isworker', false);
+    await prefs.setString('userData', jsonEncode(widget.userData!.toJson()));
   }
 
   Future<void> _pickImage() async {

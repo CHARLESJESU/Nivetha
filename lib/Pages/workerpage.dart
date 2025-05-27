@@ -47,6 +47,7 @@ class _WorkerpageState extends State<Workerpage> {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setBool('isLoggedIn', true);
     await prefs.setBool('isworker', true);
+    await prefs.setString('userData', jsonEncode(widget.userData!.toJson()));
   }
 
   Future<void> _loadPosts() async {
