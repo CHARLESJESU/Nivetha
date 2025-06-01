@@ -1,5 +1,62 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
+
+class Application {
+  final String userId;
+  final String name;
+  final String phoneNumber;
+  final String experience;
+  final String role;
+  final String gender;
+  final String dob;
+  final String country;
+  final String state;
+  final String district;
+  final String city;
+  final String area;
+  final String address;
+  String status;
+  bool showDetails;
+
+  Application({
+    required this.userId,
+    required this.name,
+    required this.phoneNumber,
+    required this.experience,
+    required this.role,
+    required this.gender,
+    required this.dob,
+    required this.country,
+    required this.state,
+    required this.district,
+    required this.city,
+    required this.area,
+    required this.address,
+    required this.status,
+    this.showDetails = false,
+  });
+
+  factory Application.fromMap(String userId, Map<dynamic, dynamic> data) {
+    return Application(
+      userId: userId,
+      name: data['name']?.toString() ?? 'N/A',
+      phoneNumber: data['phoneNumber']?.toString() ?? 'N/A',
+      experience: data['experience']?.toString() ?? 'N/A',
+      role: data['role']?.toString() ?? 'N/A',
+      gender: data['gender']?.toString() ?? 'N/A',
+      dob: data['dob']?.toString() ?? 'N/A',
+      country: data['country']?.toString() ?? 'N/A',
+      state: data['state']?.toString() ?? 'N/A',
+      district: data['district']?.toString() ?? 'N/A',
+      city: data['city']?.toString() ?? 'N/A',
+      area: data['area']?.toString() ?? 'N/A',
+      address: data['address']?.toString() ?? 'N/A',
+      status: data['status']?.toString() ?? 'applied',
+    );
+  }
+}
 
 class ApplicationsPage extends StatefulWidget {
   final String jobProviderUserId;
@@ -11,8 +68,10 @@ class ApplicationsPage extends StatefulWidget {
 }
 
 class _ApplicationsPageState extends State<ApplicationsPage> {
-  Map<String, List<Map<String, dynamic>>> groupedApplications = {};
+  Map<String, List<Application>> groupedApplications = {};
   List<bool> showOrderDetails = [];
+  bool isLoading = true;
+  StreamSubscription<DatabaseEvent>? _subscription;
 
   @override
   void initState() {
@@ -20,48 +79,34 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
     fetchApplications();
   }
 
-  Future<void> fetchApplications() async {
+  void fetchApplications() {
     final ref = FirebaseDatabase.instance
         .ref()
         .child('applications')
         .child(widget.jobProviderUserId);
 
-    try {
-      final snapshot = await ref.get();
+    _subscription = ref.onValue.listen(
+      (event) {
+        if (!mounted) return;
+        Map<String, List<Application>> tempGroupedApps = {};
 
-      if (snapshot.exists) {
-        final data = snapshot.value as Map<dynamic, dynamic>?;
-        Map<String, List<Map<String, dynamic>>> tempGroupedApps = {};
-
-        if (data != null) {
-          data.forEach((orderId, orderData) {
-            if (orderData is Map<dynamic, dynamic>) {
-              List<Map<String, dynamic>> workers = [];
-              orderData.forEach((workerUserId, workerData) {
-                if (workerData is Map<dynamic, dynamic>) {
-                  workers.add({
-                    'userId': workerUserId.toString(),
-                    'name': workerData['name']?.toString() ?? 'N/A',
-                    'phoneNumber':
-                        workerData['phoneNumber']?.toString() ?? 'N/A',
-                    'experience': workerData['experience']?.toString() ?? 'N/A',
-                    'role': workerData['role']?.toString() ?? 'N/A',
-                    'gender': workerData['gender']?.toString() ?? 'N/A',
-                    'dob': workerData['dob']?.toString() ?? 'N/A',
-                    'country': workerData['country']?.toString() ?? 'N/A',
-                    'state': workerData['state']?.toString() ?? 'N/A',
-                    'district': workerData['district']?.toString() ?? 'N/A',
-                    'city': workerData['city']?.toString() ?? 'N/A',
-                    'area': workerData['area']?.toString() ?? 'N/A',
-                    'address': workerData['address']?.toString() ?? 'N/A',
-                    'status': workerData['status']?.toString() ?? 'applied',
-                    'showDetails': false,
-                  });
-                }
-              });
-              tempGroupedApps[orderId.toString()] = workers;
-            }
-          });
+        if (event.snapshot.exists) {
+          final data = event.snapshot.value as Map<dynamic, dynamic>?;
+          if (data != null) {
+            data.forEach((orderId, orderData) {
+              if (orderData is Map<dynamic, dynamic>) {
+                List<Application> workers = [];
+                orderData.forEach((workerUserId, workerData) {
+                  if (workerData is Map<dynamic, dynamic>) {
+                    workers.add(
+                      Application.fromMap(workerUserId.toString(), workerData),
+                    );
+                  }
+                });
+                tempGroupedApps[orderId.toString()] = workers;
+              }
+            });
+          }
         }
 
         setState(() {
@@ -70,13 +115,17 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
             tempGroupedApps.length,
             (_) => false,
           );
+          isLoading = false;
         });
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load applications: $e')),
-      );
-    }
+      },
+      onError: (error) {
+        if (!mounted) return;
+        setState(() => isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load applications: $error')),
+        );
+      },
+    );
   }
 
   Future<void> updateApplicationStatus(
@@ -85,7 +134,7 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
     String newStatus,
   ) async {
     try {
-      final ref = FirebaseDatabase.instance
+      final applicationsRef = FirebaseDatabase.instance
           .ref()
           .child('applications')
           .child(widget.jobProviderUserId)
@@ -93,19 +142,28 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
           .child(workerUserId)
           .child('status');
 
-      await ref.set(newStatus);
+      final appliedJobsRef = FirebaseDatabase.instance
+          .ref()
+          .child('appliedJobs')
+          .child(workerUserId)
+          .child(widget.jobProviderUserId)
+          .child(orderId)
+          .child('status');
 
-      setState(() {
-        final workers = groupedApplications[orderId];
-        if (workers != null) {
-          final workerIndex = workers.indexWhere(
-            (w) => w['userId'] == workerUserId,
-          );
-          if (workerIndex != -1) {
-            workers[workerIndex]['status'] = newStatus;
-          }
-        }
+      // Perform atomic update to both paths
+      await FirebaseDatabase.instance.ref().update({
+        applicationsRef.path: newStatus,
+        appliedJobsRef.path: newStatus,
       });
+
+      // If status is 'rejected', hide details
+      if (newStatus == 'rejected') {
+        setState(() {
+          groupedApplications[orderId]!
+              .firstWhere((app) => app.userId == workerUserId)
+              .showDetails = false;
+        });
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -119,9 +177,22 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
     }
   }
 
+  Color getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'applied':
+        return Colors.blue;
+      case 'accepted':
+        return Colors.green;
+      case 'rejected':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
   Widget _buildOrderCard(
     String orderId,
-    List<Map<String, dynamic>> workers,
+    List<Application> workers,
     int orderIndex,
   ) {
     return Card(
@@ -150,7 +221,7 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
         children:
             workers.asMap().entries.map((entry) {
               int workerIndex = entry.key;
-              Map<String, dynamic> worker = entry.value;
+              Application worker = entry.value;
               return _buildWorkerCard(worker, orderIndex, workerIndex, orderId);
             }).toList(),
       ),
@@ -158,13 +229,13 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
   }
 
   Widget _buildWorkerCard(
-    Map<String, dynamic> worker,
+    Application worker,
     int orderIndex,
     int workerIndex,
     String orderId,
   ) {
-    bool showDetails = worker['showDetails'] ?? false;
-    String status = worker['status'] ?? 'applied';
+    bool showDetails = worker.showDetails;
+    String status = worker.status;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: Card(
@@ -183,17 +254,24 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          worker['name'] ?? 'N/A',
+                          worker.name,
                           style: const TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                         Text(
-                          'User ID: ${worker['userId'] ?? 'N/A'}',
+                          'User ID: ${worker.userId}',
                           style: const TextStyle(
                             fontSize: 13,
                             color: Colors.grey,
+                          ),
+                        ),
+                        Text(
+                          'Status: ${worker.status}',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: getStatusColor(worker.status),
                           ),
                         ),
                       ],
@@ -202,37 +280,37 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
                   IconButton(
                     icon: Icon(
                       showDetails ? Icons.expand_less : Icons.expand_more,
-                      color: Colors.blue,
+                      color: status == 'rejected' ? Colors.grey : Colors.blue,
                     ),
-                    onPressed: () {
-                      setState(() {
-                        final workers = groupedApplications[orderId];
-                        if (workers != null && workers.length > workerIndex) {
-                          workers[workerIndex]['showDetails'] = !showDetails;
-                        }
-                      });
-                    },
+                    onPressed:
+                        status == 'rejected'
+                            ? null
+                            : () {
+                              setState(() {
+                                groupedApplications[orderId]![workerIndex]
+                                    .showDetails = !showDetails;
+                              });
+                            },
                   ),
                 ],
               ),
-              if (showDetails)
+              if (showDetails && status != 'rejected')
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _detailText('Phone', worker['phoneNumber'] ?? 'N/A'),
-                      _detailText('Experience', worker['experience'] ?? 'N/A'),
-                      _detailText('Role', worker['role'] ?? 'N/A'),
-                      _detailText('Gender', worker['gender'] ?? 'N/A'),
-                      _detailText('DOB', worker['dob'] ?? 'N/A'),
-                      _detailText('Country', worker['country'] ?? 'N/A'),
-                      _detailText('State', worker['state'] ?? 'N/A'),
-                      _detailText('District', worker['district'] ?? 'N/A'),
-                      _detailText('City', worker['city'] ?? 'N/A'),
-                      _detailText('Area', worker['area'] ?? 'N/A'),
-                      _detailText('Address', worker['address'] ?? 'N/A'),
-                      _detailText('Status', status),
+                      _detailText('Phone', worker.phoneNumber),
+                      _detailText('Experience', worker.experience),
+                      _detailText('Role', worker.role),
+                      _detailText('Gender', worker.gender),
+                      _detailText('DOB', worker.dob),
+                      _detailText('Country', worker.country),
+                      _detailText('State', worker.state),
+                      _detailText('District', worker.district),
+                      _detailText('City', worker.city),
+                      _detailText('Area', worker.area),
+                      _detailText('Address', worker.address),
                       const SizedBox(height: 8),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -243,7 +321,7 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
                                   status == 'applied'
                                       ? () => updateApplicationStatus(
                                         orderId,
-                                        worker['userId'],
+                                        worker.userId,
                                         'accepted',
                                       )
                                       : null,
@@ -266,7 +344,7 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
                                   status == 'applied'
                                       ? () => updateApplicationStatus(
                                         orderId,
-                                        worker['userId'],
+                                        worker.userId,
                                         'rejected',
                                       )
                                       : null,
@@ -294,7 +372,7 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
     );
   }
 
-  Widget _detailText(String label, String value) {
+  Widget _detailText(String label, String value, {Color? color}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
@@ -314,12 +392,18 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(fontSize: 13, color: Colors.black87),
+              style: TextStyle(fontSize: 13, color: color ?? Colors.black87),
             ),
           ),
         ],
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    super.dispose();
   }
 
   @override
@@ -331,8 +415,23 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
         foregroundColor: Colors.white,
       ),
       body:
-          groupedApplications.isEmpty
-              ? const Center(child: Text('No applications yet'))
+          isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : groupedApplications.isEmpty
+              ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.work_off, size: 50, color: Colors.grey),
+                    const SizedBox(height: 10),
+                    const Text('No applications yet'),
+                    TextButton(
+                      onPressed: fetchApplications,
+                      child: const Text('Refresh'),
+                    ),
+                  ],
+                ),
+              )
               : ListView.builder(
                 itemCount: groupedApplications.length,
                 itemBuilder: (context, index) {

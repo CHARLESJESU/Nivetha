@@ -62,6 +62,28 @@ class _JobStatusPageState extends State<JobStatusPage> {
     }
   }
 
+  Color getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'accepted':
+        return Colors.green;
+      case 'rejected':
+        return Colors.red;
+      default:
+        return Colors.orange;
+    }
+  }
+
+  IconData getStatusIcon(String status) {
+    switch (status.toLowerCase()) {
+      case 'accepted':
+        return Icons.check_circle;
+      case 'rejected':
+        return Icons.cancel;
+      default:
+        return Icons.hourglass_top;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -79,6 +101,8 @@ class _JobStatusPageState extends State<JobStatusPage> {
                 itemCount: jobList.length,
                 itemBuilder: (context, index) {
                   final job = jobList[index];
+                  final statusColor = getStatusColor(job['status']);
+                  final statusIcon = getStatusIcon(job['status']);
                   return Card(
                     margin: const EdgeInsets.only(bottom: 16),
                     shape: RoundedRectangleBorder(
@@ -94,6 +118,7 @@ class _JobStatusPageState extends State<JobStatusPage> {
                             "Job ID: ${job['postId']}",
                             style: const TextStyle(
                               fontWeight: FontWeight.bold,
+                              fontSize: 16,
                               color: Colors.black87,
                             ),
                           ),
@@ -104,19 +129,29 @@ class _JobStatusPageState extends State<JobStatusPage> {
                               borderRadius: BorderRadius.circular(10),
                               child: Image.memory(
                                 base64Decode(job['imageBase64']),
-                                height: 100,
+                                height: 120,
                                 width: double.infinity,
                                 fit: BoxFit.cover,
                               ),
                             ),
                           const SizedBox(height: 8),
-                          Text("Description: ${job['description']}"),
+                          Text(
+                            "Description: ${job['description']}",
+                            style: const TextStyle(fontSize: 14),
+                          ),
                           const SizedBox(height: 8),
                           Row(
                             children: [
-                              const Icon(Icons.info, color: Colors.green),
-                              const SizedBox(width: 4),
-                              Text("Status: ${job['status']}"),
+                              Icon(statusIcon, color: statusColor),
+                              const SizedBox(width: 6),
+                              Text(
+                                "Status: ${job['status'].toString().toUpperCase()}",
+                                style: TextStyle(
+                                  color: statusColor,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
                             ],
                           ),
                         ],
