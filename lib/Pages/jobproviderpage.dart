@@ -37,7 +37,7 @@ class _JobproviderpageState extends State<Jobproviderpage> {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setBool('isLoggedIn', true);
     await prefs.setBool('isworker', false);
-    await prefs.setString('userData', jsonEncode(widget.userData!.toJson()));
+    await prefs.setString('userData', jsonEncode(widget.userData.toJson()));
   }
 
   Future<void> _pickImage() async {
@@ -141,7 +141,7 @@ class _JobproviderpageState extends State<Jobproviderpage> {
       child: Scaffold(
         key: _scaffoldKey,
         appBar: AppBar(
-          title: Text(' ${userData.name}'),
+          title: Text('${userData.name}'),
           backgroundColor: Colors.blue,
           leading: IconButton(
             icon: _buildProfileAvatar(radius: 20),
@@ -196,30 +196,45 @@ class _JobproviderpageState extends State<Jobproviderpage> {
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
-          UserAccountsDrawerHeader(
-            accountName: Text(userData.name),
-            accountEmail: Text(userData.phoneNumber),
-            currentAccountPicture: Stack(
+          Container(
+            color: Colors.blue,
+            padding: EdgeInsets.only(top: 50, bottom: 20),
+            child: Column(
               children: [
-                _buildProfileAvatar(radius: 40),
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: GestureDetector(
-                    onTap: _pickImage,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                      ),
-                      padding: EdgeInsets.all(3),
-                      child: Icon(Icons.edit, size: 18, color: Colors.blue),
-                    ),
+                CircleAvatar(
+                  backgroundColor: Colors.grey[200],
+                  radius: 40,
+                  backgroundImage:
+                      userData.profileImage != null &&
+                              userData.profileImage!.isNotEmpty
+                          ? FileImage(File(userData.profileImage!))
+                          : null,
+                  child:
+                      userData.profileImage == null ||
+                              userData.profileImage!.isEmpty
+                          ? Text(
+                            userData.name.isNotEmpty
+                                ? userData.name[0].toUpperCase()
+                                : '?',
+                            style: TextStyle(fontSize: 40, color: Colors.blue),
+                          )
+                          : null,
+                ),
+                SizedBox(height: 8),
+                Text(
+                  userData.name,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
                   ),
+                ),
+                Text(
+                  userData.phoneNumber,
+                  style: TextStyle(color: Colors.white70),
                 ),
               ],
             ),
-            decoration: BoxDecoration(color: Colors.blue),
           ),
           ListTile(
             leading: Icon(Icons.logout),
