@@ -86,80 +86,84 @@ class _JobStatusPageState extends State<JobStatusPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Job Application Status'),
-        backgroundColor: Colors.blueAccent,
-      ),
-      body:
-          isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : jobList.isEmpty
-              ? const Center(child: Text('No job applications found.'))
-              : ListView.builder(
-                padding: const EdgeInsets.all(12),
-                itemCount: jobList.length,
-                itemBuilder: (context, index) {
-                  final job = jobList[index];
-                  final statusColor = getStatusColor(job['status']);
-                  final statusIcon = getStatusIcon(job['status']);
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 4,
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "Job ID: ${job['postId']}",
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              color: Colors.black87,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          if (job['imageBase64'] != null &&
-                              job['imageBase64'].toString().isNotEmpty)
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(10),
-                              child: Image.memory(
-                                base64Decode(job['imageBase64']),
-                                height: 120,
-                                width: double.infinity,
-                                fit: BoxFit.cover,
+    return WillPopScope(
+      onWillPop: () async {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Exiting Job Status Page')));
+        return true;
+      },
+      child: Scaffold(
+        body:
+            isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : jobList.isEmpty
+                ? const Center(child: Text('No job applications found.'))
+                : ListView.builder(
+                  padding: const EdgeInsets.all(12),
+                  itemCount: jobList.length,
+                  itemBuilder: (context, index) {
+                    final job = jobList[index];
+                    final statusColor = getStatusColor(job['status']);
+                    final statusIcon = getStatusIcon(job['status']);
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 4,
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "Job Provider ID: ${job['jobProviderId']}",
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: Colors.black87,
                               ),
                             ),
-                          const SizedBox(height: 8),
-                          Text(
-                            "Description: ${job['description']}",
-                            style: const TextStyle(fontSize: 14),
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Icon(statusIcon, color: statusColor),
-                              const SizedBox(width: 6),
-                              Text(
-                                "Status: ${job['status'].toString().toUpperCase()}",
-                                style: TextStyle(
-                                  color: statusColor,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
+                            const SizedBox(height: 8),
+                            if (job['imageBase64'] != null &&
+                                job['imageBase64'].toString().isNotEmpty)
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: Image.memory(
+                                  base64Decode(job['imageBase64']),
+                                  height: 120,
+                                  width: double.infinity,
+                                  fit: BoxFit.cover,
                                 ),
                               ),
-                            ],
-                          ),
-                        ],
+                            const SizedBox(height: 8),
+                            Text(
+                              "Description: ${job['description']}",
+                              style: const TextStyle(fontSize: 14),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Icon(statusIcon, color: statusColor),
+                                const SizedBox(width: 6),
+                                Text(
+                                  "Status: ${job['status'].toString().toUpperCase()}",
+                                  style: TextStyle(
+                                    color: statusColor,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  );
-                },
-              ),
+                    );
+                  },
+                ),
+      ),
     );
   }
 }

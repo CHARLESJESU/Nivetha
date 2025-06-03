@@ -23,8 +23,6 @@ class Workerpage extends StatefulWidget {
 class _WorkerpageState extends State<Workerpage> {
   late UserData userData;
   int _selectedIndex = 0;
-  int _backPressCounter = 0;
-  DateTime? _lastBackPressed;
 
   List<Post> posts = [];
   bool isLoading = true;
@@ -35,7 +33,7 @@ class _WorkerpageState extends State<Workerpage> {
     super.initState();
     userData = widget.userData;
     _initializePreferences();
-    _loadAppliedJobs(); // ✅ Load previously applied jobs
+    _loadAppliedJobs();
     _loadPosts();
   }
 
@@ -50,9 +48,7 @@ class _WorkerpageState extends State<Workerpage> {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     List<String> appliedPostIds = prefs.getStringList('appliedJobIds') ?? [];
     setState(() {
-      appliedJobs = {
-        for (var id in appliedPostIds) id: true,
-      };
+      appliedJobs = {for (var id in appliedPostIds) id: true};
     });
   }
 
@@ -96,7 +92,7 @@ class _WorkerpageState extends State<Workerpage> {
         isLoading = false;
       });
     } catch (e) {
-      print("Failed to load posts: $e");
+      _showCustomSnackBar("Failed to load posts: $e", isError: true);
       setState(() => isLoading = false);
     }
   }
@@ -105,28 +101,33 @@ class _WorkerpageState extends State<Workerpage> {
     final picker = ImagePicker();
     final XFile? image = await showModalBottomSheet<XFile?>(
       context: context,
-      builder: (context) => SafeArea(
-        child: Wrap(
-          children: [
-            ListTile(
-              leading: Icon(Icons.camera_alt),
-              title: Text('Take Photo'),
-              onTap: () async {
-                final picked = await picker.pickImage(source: ImageSource.camera);
-                Navigator.pop(context, picked);
-              },
+      builder:
+          (context) => SafeArea(
+            child: Wrap(
+              children: [
+                ListTile(
+                  leading: Icon(Icons.camera_alt),
+                  title: Text('Take Photo'),
+                  onTap: () async {
+                    final picked = await picker.pickImage(
+                      source: ImageSource.camera,
+                    );
+                    Navigator.pop(context, picked);
+                  },
+                ),
+                ListTile(
+                  leading: Icon(Icons.photo_library),
+                  title: Text('Choose from Gallery'),
+                  onTap: () async {
+                    final picked = await picker.pickImage(
+                      source: ImageSource.gallery,
+                    );
+                    Navigator.pop(context, picked);
+                  },
+                ),
+              ],
             ),
-            ListTile(
-              leading: Icon(Icons.photo_library),
-              title: Text('Choose from Gallery'),
-              onTap: () async {
-                final picked = await picker.pickImage(source: ImageSource.gallery);
-                Navigator.pop(context, picked);
-              },
-            ),
-          ],
-        ),
-      ),
+          ),
     );
     if (image != null) setState(() => userData.profileImage = image.path);
   }
@@ -134,9 +135,7 @@ class _WorkerpageState extends State<Workerpage> {
   Future<void> _applyForJob(String jobProviderUserId, String postId) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please log in to apply for jobs")),
-      );
+      _showCustomSnackBar("Please log in to apply for jobs", isError: true);
       return;
     }
 
@@ -160,20 +159,19 @@ class _WorkerpageState extends State<Workerpage> {
       };
 
       final post = posts.firstWhere(
-            (p) => p.postId == postId && p.userId == jobProviderUserId,
-        orElse: () => Post(
-          userId: '',
-          postId: '',
-          orderId: '',
-          description: '',
-          imageBase64: '',
-        ),
+        (p) => p.postId == postId && p.userId == jobProviderUserId,
+        orElse:
+            () => Post(
+              userId: '',
+              postId: '',
+              orderId: '',
+              description: '',
+              imageBase64: '',
+            ),
       );
 
       if (post.postId.isEmpty || post.userId.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Post not found or invalid")),
-        );
+        _showCustomSnackBar("Post not found or invalid", isError: true);
         return;
       }
 
@@ -194,24 +192,42 @@ class _WorkerpageState extends State<Workerpage> {
           .set(appliedJobDetails);
 
       setState(() => appliedJobs[postId] = true);
-      await _saveAppliedJob(postId); // ✅ Save applied job locally
+      await _saveAppliedJob(postId);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Successfully applied to the job!")),
-      );
+      _showCustomSnackBar("Successfully applied to the job!");
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed to apply to the job: $e")),
-      );
+      _showCustomSnackBar("Failed to apply to the job: $e", isError: true);
     }
   }
 
+  void _showCustomSnackBar(String message, {bool isError = false}) {
+    final backgroundColor = isError ? Colors.red : Colors.green;
+    final icon = isError ? Icons.error : Icons.check_circle;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: backgroundColor,
+        content: Row(
+          children: [
+            Icon(icon, color: Colors.white),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(message, style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: EdgeInsets.all(16),
+        duration: Duration(seconds: 3),
+      ),
+    );
+  }
+
   Widget _buildMainContent() {
-    if (_selectedIndex == 0) {
-      return buildJobPosts();
-    } else {
-      return JobStatusPage(userData: userData);
-    }
+    return _selectedIndex == 0
+        ? buildJobPosts()
+        : JobStatusPage(userData: userData);
   }
 
   Widget buildJobPosts() {
@@ -220,115 +236,125 @@ class _WorkerpageState extends State<Workerpage> {
         : posts.isEmpty
         ? Center(child: Text("No jobs available."))
         : ListView.builder(
-      padding: const EdgeInsets.all(12),
-      itemCount: posts.length,
-      itemBuilder: (context, index) {
-        final post = posts[index];
-        final isApplied = appliedJobs[post.postId] ?? false;
+          padding: const EdgeInsets.all(12),
+          itemCount: posts.length,
+          itemBuilder: (context, index) {
+            final post = posts[index];
+            final isApplied = appliedJobs[post.postId] ?? false;
 
-        return Card(
-          color: Color(0xFFF2F2F2),
-          margin: const EdgeInsets.only(bottom: 16),
-          elevation: 4,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "Job Provider Id: ${post.userId}",
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blueAccent,
-                  ),
-                ),
-                SizedBox(height: 8),
-                Row(
+            return Card(
+              color: Color(0xFFF2F2F2),
+              margin: const EdgeInsets.only(bottom: 16),
+              elevation: 4,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (post.imageBase64.isNotEmpty)
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => Scaffold(
-                                appBar: AppBar(
-                                  backgroundColor: Colors.black,
-                                  iconTheme: IconThemeData(color: Colors.white),
+                    Text(
+                      "Job Provider Id: ${post.userId}",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blueAccent,
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (post.imageBase64.isNotEmpty)
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder:
+                                      (_) => Scaffold(
+                                        appBar: AppBar(
+                                          backgroundColor: Colors.black,
+                                          iconTheme: IconThemeData(
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                        backgroundColor: Colors.black,
+                                        body: Center(
+                                          child: InteractiveViewer(
+                                            child: Image.memory(
+                                              base64Decode(post.imageBase64),
+                                              fit: BoxFit.contain,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
                                 ),
-                                backgroundColor: Colors.black,
-                                body: Center(
-                                  child: InteractiveViewer(
-                                    child: Image.memory(
-                                      base64Decode(post.imageBase64),
-                                      fit: BoxFit.contain,
+                              );
+                            },
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: Image.memory(
+                                base64Decode(post.imageBase64),
+                                height: 100,
+                                width: 100,
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                          ),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                post.description,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              SizedBox(height: 12),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: ElevatedButton.icon(
+                                  onPressed:
+                                      isApplied
+                                          ? null
+                                          : () => _applyForJob(
+                                            post.userId,
+                                            post.postId,
+                                          ),
+                                  icon: Icon(Icons.work, color: Colors.white),
+                                  label: Text(
+                                    isApplied ? "Applied" : "Apply Now",
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor:
+                                        isApplied ? Colors.grey : Colors.blue,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 10,
                                     ),
                                   ),
                                 ),
                               ),
-                            ),
-                          );
-                        },
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: Image.memory(
-                            base64Decode(post.imageBase64),
-                            height: 100,
-                            width: 100,
-                            fit: BoxFit.cover,
+                            ],
                           ),
                         ),
-                      ),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            post.description,
-                            style: TextStyle(fontSize: 16, color: Colors.black87),
-                          ),
-                          SizedBox(height: 12),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: ElevatedButton.icon(
-                              onPressed: isApplied
-                                  ? null
-                                  : () => _applyForJob(post.userId, post.postId),
-                              icon: Icon(Icons.work, color: Colors.white),
-                              label: Text(
-                                isApplied ? "Applied" : "Apply Now",
-                                style: TextStyle(color: Colors.white),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor:
-                                isApplied ? Colors.grey : Colors.blue,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 10,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         );
-      },
-    );
   }
 
   @override
@@ -343,7 +369,11 @@ class _WorkerpageState extends State<Workerpage> {
         appBar: AppBar(
           title: Text(
             _selectedIndex == 0 ? 'Welcome, ${userData.name}' : 'Job Status',
-            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 25),
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+              fontSize: 25,
+            ),
           ),
           backgroundColor: Colors.blueAccent,
           leading: IconButton(
@@ -359,7 +389,10 @@ class _WorkerpageState extends State<Workerpage> {
           onTap: (index) => setState(() => _selectedIndex = index),
           items: const [
             BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-            BottomNavigationBarItem(icon: Icon(Icons.assignment), label: 'Job Status'),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.assignment),
+              label: 'Job Status',
+            ),
           ],
         ),
       ),
@@ -372,7 +405,10 @@ class _WorkerpageState extends State<Workerpage> {
         padding: EdgeInsets.zero,
         children: [
           UserAccountsDrawerHeader(
-            accountName: Text(userData.name, style: TextStyle(fontWeight: FontWeight.bold)),
+            accountName: Text(
+              userData.name,
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
             accountEmail: Text(userData.phoneNumber),
             currentAccountPicture: Stack(
               children: [
@@ -383,9 +419,16 @@ class _WorkerpageState extends State<Workerpage> {
                   child: GestureDetector(
                     onTap: _pickImage,
                     child: Container(
-                      decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
                       padding: EdgeInsets.all(3),
-                      child: Icon(Icons.edit, size: 18, color: Colors.blueAccent),
+                      child: Icon(
+                        Icons.edit,
+                        size: 18,
+                        color: Colors.blueAccent,
+                      ),
                     ),
                   ),
                 ),
@@ -423,12 +466,18 @@ class _WorkerpageState extends State<Workerpage> {
           Divider(),
           Padding(
             padding: const EdgeInsets.all(16.0),
-            child: Text('Profile Details', style: TextStyle(fontWeight: FontWeight.bold)),
+            child: Text(
+              'Profile Details',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
           ),
           _buildProfileDetail('User Id', userData.userId),
           _buildProfileDetail('Role', userData.role),
           _buildProfileDetail('Gender', userData.gender),
-          _buildProfileDetail('DOB', userData.dob?.toLocal().toString().split(' ')[0] ?? 'Not Set'),
+          _buildProfileDetail(
+            'DOB',
+            userData.dob?.toLocal().toString().split(' ')[0] ?? 'Not Set',
+          ),
           _buildProfileDetail('Phone', userData.phoneNumber),
           _buildProfileDetail('Country', userData.country),
           _buildProfileDetail('State', userData.state),
@@ -436,7 +485,8 @@ class _WorkerpageState extends State<Workerpage> {
           _buildProfileDetail('City', userData.city),
           _buildProfileDetail('Area', userData.area),
           _buildProfileDetail('Address', userData.address),
-          if (userData.role == 'Worker') _buildProfileDetail('Experience', userData.experience ?? ''),
+          if (userData.role == 'Worker')
+            _buildProfileDetail('Experience', userData.experience ?? ''),
         ],
       ),
     );
@@ -464,7 +514,10 @@ class _WorkerpageState extends State<Workerpage> {
     child: Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text('$label:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+        Text(
+          '$label:',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        ),
         Text(value, style: TextStyle(fontSize: 16)),
       ],
     ),
