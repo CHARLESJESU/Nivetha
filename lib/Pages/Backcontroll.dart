@@ -11,19 +11,21 @@ class BackButtonController extends GetxController {
         now.difference(_lastPressed!) > Duration(seconds: 2)) {
       _lastPressed = now;
 
-      // ✅ Styled snackbar (only this changed)
-      Get.closeAllSnackbars(); // Close previous snackbars if any
-      Get.snackbar(
-        'Exit App',
-        'Press back again to exit',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.black87,
-        colorText: Colors.white,
-        margin: EdgeInsets.all(12),
-        borderRadius: 10,
-        duration: Duration(seconds: 2),
-        icon: Icon(Icons.exit_to_app, color: Colors.white),
-      );
+      // ✅ Normal ScaffoldMessenger snackbar
+      final context = Get.context;
+      if (context != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Press back again to exit'),
+            duration: Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            margin: EdgeInsets.all(12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        );
+      }
 
       return false;
     }
