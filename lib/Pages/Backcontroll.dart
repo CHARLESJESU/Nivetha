@@ -1,5 +1,4 @@
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -8,14 +7,30 @@ class BackButtonController extends GetxController {
 
   Future<bool> handleWillPop() async {
     DateTime now = DateTime.now();
-    if (_lastPressed == null || now.difference(_lastPressed!) > Duration(seconds: 2)) {
+    if (_lastPressed == null ||
+        now.difference(_lastPressed!) > Duration(seconds: 2)) {
       _lastPressed = now;
-      Get.snackbar('Exit', 'Press back again to exit');
+
+      // ✅ Styled snackbar (only this changed)
+      Get.closeAllSnackbars(); // Close previous snackbars if any
+      Get.snackbar(
+        'Exit App',
+        'Press back again to exit',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.black87,
+        colorText: Colors.white,
+        margin: EdgeInsets.all(12),
+        borderRadius: 10,
+        duration: Duration(seconds: 2),
+        icon: Icon(Icons.exit_to_app, color: Colors.white),
+      );
+
       return false;
     }
     return true;
   }
 }
+
 class FullImagePage extends StatelessWidget {
   final String imageBase64;
 

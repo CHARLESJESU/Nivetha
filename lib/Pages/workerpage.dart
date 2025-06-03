@@ -23,6 +23,8 @@ class Workerpage extends StatefulWidget {
 class _WorkerpageState extends State<Workerpage> {
   late UserData userData;
   int _selectedIndex = 0;
+  int _backPressCounter = 0;
+  DateTime? _lastBackPressed;
 
   List<Post> posts = [];
   bool isLoading = true;
@@ -33,7 +35,7 @@ class _WorkerpageState extends State<Workerpage> {
     super.initState();
     userData = widget.userData;
     _initializePreferences();
-    _loadAppliedJobs();
+    _loadAppliedJobs(); // ✅ Load previously applied jobs
     _loadPosts();
   }
 
@@ -92,7 +94,7 @@ class _WorkerpageState extends State<Workerpage> {
         isLoading = false;
       });
     } catch (e) {
-      _showCustomSnackBar("Failed to load posts: $e", isError: true);
+      print("Failed to load posts: $e");
       setState(() => isLoading = false);
     }
   }
@@ -135,7 +137,9 @@ class _WorkerpageState extends State<Workerpage> {
   Future<void> _applyForJob(String jobProviderUserId, String postId) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      _showCustomSnackBar("Please log in to apply for jobs", isError: true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please log in to apply for jobs")),
+      );
       return;
     }
 
@@ -171,7 +175,9 @@ class _WorkerpageState extends State<Workerpage> {
       );
 
       if (post.postId.isEmpty || post.userId.isEmpty) {
-        _showCustomSnackBar("Post not found or invalid", isError: true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Post not found or invalid")),
+        );
         return;
       }
 
@@ -192,42 +198,24 @@ class _WorkerpageState extends State<Workerpage> {
           .set(appliedJobDetails);
 
       setState(() => appliedJobs[postId] = true);
-      await _saveAppliedJob(postId);
+      await _saveAppliedJob(postId); // ✅ Save applied job locally
 
-      _showCustomSnackBar("Successfully applied to the job!");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Successfully applied to the job!")),
+      );
     } catch (e) {
-      _showCustomSnackBar("Failed to apply to the job: $e", isError: true);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Failed to apply to the job: $e")));
     }
   }
 
-  void _showCustomSnackBar(String message, {bool isError = false}) {
-    final backgroundColor = isError ? Colors.red : Colors.green;
-    final icon = isError ? Icons.error : Icons.check_circle;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: backgroundColor,
-        content: Row(
-          children: [
-            Icon(icon, color: Colors.white),
-            SizedBox(width: 12),
-            Expanded(
-              child: Text(message, style: TextStyle(color: Colors.white)),
-            ),
-          ],
-        ),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        margin: EdgeInsets.all(16),
-        duration: Duration(seconds: 3),
-      ),
-    );
-  }
-
   Widget _buildMainContent() {
-    return _selectedIndex == 0
-        ? buildJobPosts()
-        : JobStatusPage(userData: userData);
+    if (_selectedIndex == 0) {
+      return buildJobPosts();
+    } else {
+      return JobStatusPage(userData: userData);
+    }
   }
 
   Widget buildJobPosts() {
