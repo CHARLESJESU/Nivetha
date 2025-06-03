@@ -198,27 +198,42 @@ class _JobproviderpageState extends State<Jobproviderpage> {
         children: [
           Container(
             color: Colors.blue,
-            padding: EdgeInsets.only(top: 50, bottom: 20),
+            padding: EdgeInsets.symmetric(vertical: 30),
             child: Column(
               children: [
-                CircleAvatar(
-                  backgroundColor: Colors.grey[200],
-                  radius: 40,
-                  backgroundImage:
-                      userData.profileImage != null &&
-                              userData.profileImage!.isNotEmpty
-                          ? FileImage(File(userData.profileImage!))
-                          : null,
-                  child:
-                      userData.profileImage == null ||
-                              userData.profileImage!.isEmpty
-                          ? Text(
-                            userData.name.isNotEmpty
-                                ? userData.name[0].toUpperCase()
-                                : '?',
-                            style: TextStyle(fontSize: 40, color: Colors.blue),
-                          )
-                          : null,
+                Stack(
+                  alignment: Alignment.bottomRight,
+                  children: [
+                    CircleAvatar(
+                      backgroundColor: Colors.grey[200],
+                      radius: 40,
+                      backgroundImage:
+                          userData.profileImage != null &&
+                                  userData.profileImage!.isNotEmpty
+                              ? FileImage(File(userData.profileImage!))
+                              : null,
+                      child:
+                          userData.profileImage == null ||
+                                  userData.profileImage!.isEmpty
+                              ? Text(
+                                userData.name.isNotEmpty
+                                    ? userData.name[0].toUpperCase()
+                                    : '?',
+                                style: TextStyle(
+                                  fontSize: 40,
+                                  color: Colors.blue,
+                                ),
+                              )
+                              : null,
+                    ),
+                    Positioned(
+                      child: CircleAvatar(
+                        backgroundColor: Colors.white,
+                        radius: 12,
+                        child: Icon(Icons.edit, size: 15, color: Colors.blue),
+                      ),
+                    ),
+                  ],
                 ),
                 SizedBox(height: 8),
                 Text(
