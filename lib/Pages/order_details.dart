@@ -5,8 +5,8 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:photo_view/photo_view.dart';
 
 class Order {
-  final String id; // Firebase key
-  final String orderId; // Your custom generated order ID
+  final String id;
+  final String orderId;
   final String description;
   final String imageBase64;
 
@@ -178,130 +178,158 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
       body:
           isLoading
               ? Center(child: CircularProgressIndicator())
-              : orders.isEmpty
-              ? Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
-                    Icon(Icons.inbox, size: 48, color: Colors.grey),
-                    SizedBox(height: 10),
-                    Text(
-                      "No orders posted yet.",
-                      style: TextStyle(color: Colors.grey),
-                    ),
-                  ],
-                ),
-              )
-              : ListView.builder(
-                padding: EdgeInsets.all(12),
-                itemCount: orders.length,
-                itemBuilder: (context, index) {
-                  final order = orders[index];
-                  return Card(
-                    margin: EdgeInsets.only(bottom: 10),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    elevation: 4,
-                    child: Padding(
-                      padding: EdgeInsets.all(6),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.only(
-                              top: 10.0,
-                              left: 12.0,
-                            ),
-                            child: Text(
-                              "Order ID: ${order.orderId}", // 👈 custom ID
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                                color: Colors.grey[700],
+              : RefreshIndicator(
+                onRefresh: _loadOrders,
+                child:
+                    orders.isEmpty
+                        ? ListView(
+                          physics: AlwaysScrollableScrollPhysics(),
+                          children: const [
+                            SizedBox(height: 200),
+                            Center(
+                              child: Icon(
+                                Icons.inbox,
+                                size: 48,
+                                color: Colors.grey,
                               ),
                             ),
-                          ),
-                          Align(
-                            alignment: Alignment.topRight,
-                            child: Padding(
-                              padding: EdgeInsets.only(top: 0, right: 8),
-                              child: PopupMenuButton<String>(
-                                onSelected: (value) {
-                                  if (value == 'edit') {
-                                    _editOrder(order.id, order.description);
-                                  } else if (value == 'delete') {
-                                    _deleteOrder(order.id);
-                                  }
-                                },
-                                itemBuilder:
-                                    (BuildContext context) => [
-                                      PopupMenuItem<String>(
-                                        value: 'edit',
-                                        child: Text('Edit'),
-                                      ),
-                                      PopupMenuItem<String>(
-                                        value: 'delete',
-                                        child: Text('Delete'),
-                                      ),
-                                    ],
+                            SizedBox(height: 10),
+                            Center(
+                              child: Text(
+                                "No orders posted yet.",
+                                style: TextStyle(color: Colors.grey),
                               ),
                             ),
-                          ),
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              InkWell(
-                                onTap: () => _openFullImage(order.imageBase64),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(12),
-                                  child:
-                                      order.imageBase64.isNotEmpty
-                                          ? Image.memory(
-                                            _decodeBase64(order.imageBase64),
-                                            width: 98,
-                                            height: 98,
-                                            fit: BoxFit.cover,
-                                          )
-                                          : Container(
-                                            width: 98,
-                                            height: 98,
-                                            color: Colors.grey[200],
-                                            child: Center(
-                                              child: Text(
-                                                "No image",
-                                                style: TextStyle(
-                                                  color: Colors.grey[700],
+                          ],
+                        )
+                        : ListView.builder(
+                          padding: EdgeInsets.all(12),
+                          itemCount: orders.length,
+                          itemBuilder: (context, index) {
+                            final order = orders[index];
+                            return Card(
+                              margin: EdgeInsets.only(bottom: 10),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              elevation: 4,
+                              child: Padding(
+                                padding: EdgeInsets.all(6),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Padding(
+                                      padding: const EdgeInsets.only(
+                                        top: 10.0,
+                                        left: 12.0,
+                                      ),
+                                      child: Text(
+                                        "Order ID: ${order.orderId}",
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13,
+                                          color: Colors.grey[700],
+                                        ),
+                                      ),
+                                    ),
+                                    Align(
+                                      alignment: Alignment.topRight,
+                                      child: Padding(
+                                        padding: EdgeInsets.only(
+                                          top: 0,
+                                          right: 8,
+                                        ),
+                                        child: PopupMenuButton<String>(
+                                          onSelected: (value) {
+                                            if (value == 'edit') {
+                                              _editOrder(
+                                                order.id,
+                                                order.description,
+                                              );
+                                            } else if (value == 'delete') {
+                                              _deleteOrder(order.id);
+                                            }
+                                          },
+                                          itemBuilder:
+                                              (BuildContext context) => [
+                                                PopupMenuItem<String>(
+                                                  value: 'edit',
+                                                  child: Text('Edit'),
                                                 ),
+                                                PopupMenuItem<String>(
+                                                  value: 'delete',
+                                                  child: Text('Delete'),
+                                                ),
+                                              ],
+                                        ),
+                                      ),
+                                    ),
+                                    Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        InkWell(
+                                          onTap:
+                                              () => _openFullImage(
+                                                order.imageBase64,
+                                              ),
+                                          child: ClipRRect(
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                            child:
+                                                order.imageBase64.isNotEmpty
+                                                    ? Image.memory(
+                                                      _decodeBase64(
+                                                        order.imageBase64,
+                                                      ),
+                                                      width: 98,
+                                                      height: 98,
+                                                      fit: BoxFit.cover,
+                                                    )
+                                                    : Container(
+                                                      width: 98,
+                                                      height: 98,
+                                                      color: Colors.grey[200],
+                                                      child: Center(
+                                                        child: Text(
+                                                          "No image",
+                                                          style: TextStyle(
+                                                            color:
+                                                                Colors
+                                                                    .grey[700],
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                          ),
+                                        ),
+                                        SizedBox(width: 8),
+                                        Expanded(
+                                          child: Container(
+                                            height: 98,
+                                            padding: EdgeInsets.all(6),
+                                            decoration: BoxDecoration(
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                              color: Colors.grey[100],
+                                            ),
+                                            child: SingleChildScrollView(
+                                              child: Text(
+                                                order.description,
+                                                style: TextStyle(fontSize: 14),
                                               ),
                                             ),
                                           ),
-                                ),
-                              ),
-                              SizedBox(width: 8),
-                              Expanded(
-                                child: Container(
-                                  height: 98,
-                                  padding: EdgeInsets.all(6),
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(8),
-                                    color: Colors.grey[100],
-                                  ),
-                                  child: SingleChildScrollView(
-                                    child: Text(
-                                      order.description,
-                                      style: TextStyle(fontSize: 14),
+                                        ),
+                                      ],
                                     ),
-                                  ),
+                                  ],
                                 ),
                               ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
+                            );
+                          },
+                        ),
               ),
     );
   }

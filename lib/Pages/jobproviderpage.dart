@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -37,7 +38,7 @@ class _JobproviderpageState extends State<Jobproviderpage> {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setBool('isLoggedIn', true);
     await prefs.setBool('isworker', false);
-    await prefs.setString('userData', jsonEncode(widget.userData.toJson()));
+    await prefs.setString('userData', jsonEncode(widget.userData!.toJson()));
   }
 
   Future<void> _pickImage() async {
@@ -141,14 +142,14 @@ class _JobproviderpageState extends State<Jobproviderpage> {
       child: Scaffold(
         key: _scaffoldKey,
         appBar: AppBar(
-          title: Text('${userData.name}'),
+          title: Text(' ${userData.name}'),
           backgroundColor: Colors.blue,
           leading: IconButton(
             icon: _buildProfileAvatar(radius: 20),
             onPressed: () => _scaffoldKey.currentState?.openDrawer(),
           ),
         ),
-        drawer: _buildDrawer(),
+        drawer: buildDrawer(),
         body: Stack(
           children: [
             _buildSelectedPage(),
@@ -191,97 +192,67 @@ class _JobproviderpageState extends State<Jobproviderpage> {
     );
   }
 
-  Drawer _buildDrawer() {
+  Drawer buildDrawer() {
     return Drawer(
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
-          Container(
-            color: Colors.blue,
-            padding: EdgeInsets.symmetric(vertical: 30),
-            child: Column(
+          UserAccountsDrawerHeader(
+            accountName: Text(
+              userData.name,
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            accountEmail: Text(userData.phoneNumber),
+            currentAccountPicture: Stack(
               children: [
-                Stack(
-                  alignment: Alignment.bottomRight,
-                  children: [
-                    CircleAvatar(
-                      backgroundColor: Colors.grey[200],
-                      radius: 40,
-                      backgroundImage:
-                          userData.profileImage != null &&
-                                  userData.profileImage!.isNotEmpty
-                              ? FileImage(File(userData.profileImage!))
-                              : null,
-                      child:
-                          userData.profileImage == null ||
-                                  userData.profileImage!.isEmpty
-                              ? Text(
-                                userData.name.isNotEmpty
-                                    ? userData.name[0].toUpperCase()
-                                    : '?',
-                                style: TextStyle(
-                                  fontSize: 40,
-                                  color: Colors.blue,
-                                ),
-                              )
-                              : null,
-                    ),
-                    Positioned(
-                      child: CircleAvatar(
-                        backgroundColor: Colors.white,
-                        radius: 12,
-                        child: Icon(Icons.edit, size: 15, color: Colors.blue),
+                _buildProfileAvatar(radius: 40),
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: GestureDetector(
+                    onTap: _pickImage,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                      padding: EdgeInsets.all(3),
+                      child: Icon(
+                        Icons.edit,
+                        size: 18,
+                        color: Colors.blueAccent,
                       ),
                     ),
-                  ],
-                ),
-                SizedBox(height: 8),
-                Text(
-                  userData.name,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
                   ),
-                ),
-                Text(
-                  userData.phoneNumber,
-                  style: TextStyle(color: Colors.white70),
                 ),
               ],
             ),
+            decoration: BoxDecoration(color: Colors.blueAccent),
           ),
           ListTile(
             leading: Icon(Icons.logout),
             title: Text('Logout'),
             onTap: () async {
-              bool shouldLogout = await showDialog(
-                context: context,
-                builder: (context) {
-                  return AlertDialog(
-                    title: Text("Confirm Logout"),
-                    content: Text("Are you sure you want to logout?"),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(false),
-                        child: Text("Cancel"),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(true),
-                        child: Text("Confirm"),
-                      ),
-                    ],
-                  );
-                },
+              final shouldLogout = await Get.dialog(
+                AlertDialog(
+                  title: Text("Confirm Logout"),
+                  content: Text("Are you sure you want to logout?"),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Get.back(result: false),
+                      child: Text("Cancel"),
+                    ),
+                    TextButton(
+                      onPressed: () => Get.back(result: true),
+                      child: Text("Confirm"),
+                    ),
+                  ],
+                ),
               );
-
               if (shouldLogout == true) {
                 SharedPreferences prefs = await SharedPreferences.getInstance();
                 await prefs.setBool('isLoggedIn', false);
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LoginScreen()),
-                );
+                Get.offAll(() => LoginScreen());
               }
             },
           ),
@@ -308,27 +279,19 @@ class _JobproviderpageState extends State<Jobproviderpage> {
           _buildProfileDetail('Area', userData.area),
           _buildProfileDetail('Address', userData.address),
           if (userData.role == 'Worker')
-            _buildProfileDetail('Experience', userData.experience),
+            _buildProfileDetail('Experience', userData.experience ?? ''),
         ],
       ),
     );
   }
 
-  Widget _buildProfileDetail(String label, String value) {
-    return ListTile(
-      title: Text(label),
-      subtitle: Text(value.isNotEmpty ? value : 'Not provided'),
-    );
-  }
-
-  Widget _buildProfileAvatar({double radius = 20}) {
+  Widget _buildProfileAvatar({required double radius}) {
     if (userData.profileImage != null && userData.profileImage!.isNotEmpty) {
       return CircleAvatar(
         backgroundImage: FileImage(File(userData.profileImage!)),
         radius: radius,
       );
     }
-
     return CircleAvatar(
       backgroundColor: Colors.grey[300],
       radius: radius,
@@ -338,4 +301,18 @@ class _JobproviderpageState extends State<Jobproviderpage> {
       ),
     );
   }
+
+  Widget _buildProfileDetail(String label, String value) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 16.0),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          '$label:',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        ),
+        Text(value, style: TextStyle(fontSize: 16)),
+      ],
+    ),
+  );
 }
