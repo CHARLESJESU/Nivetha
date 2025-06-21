@@ -1,4 +1,3 @@
-// import statements
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -23,9 +22,14 @@ class Workerpage extends StatefulWidget {
 class _WorkerpageState extends State<Workerpage> {
   late UserData userData;
   int _selectedIndex = 0;
+  int _backPressCounter = 0;
+  DateTime? _lastBackPressed;
+
   List<Post> posts = [];
   bool isLoading = true;
   Map<String, bool> appliedJobs = {};
+
+  // ADDED: Filtering by district
   String selectedDistrict = 'All';
   List<String> availableDistricts = ['All'];
 
@@ -34,7 +38,7 @@ class _WorkerpageState extends State<Workerpage> {
     super.initState();
     userData = widget.userData;
     _initializePreferences();
-    _loadAppliedJobs();
+    _loadAppliedJobs(); // ✅
     _loadPosts();
   }
 
@@ -67,7 +71,7 @@ class _WorkerpageState extends State<Workerpage> {
       final postsRef = FirebaseDatabase.instance.ref().child('jobs/workers');
       final snapshot = await postsRef.get();
       List<Post> fetchedPosts = [];
-      Set<String> districtSet = {};
+      Set<String> districtSet = {}; // ADDED
 
       if (snapshot.exists) {
         final workersData = snapshot.value as Map<dynamic, dynamic>;
@@ -75,8 +79,8 @@ class _WorkerpageState extends State<Workerpage> {
           if (postsData is Map<dynamic, dynamic>) {
             postsData.forEach((key, value) {
               if (value is Map<dynamic, dynamic>) {
-                final district = value['district'] ?? 'Unknown';
-                districtSet.add(district);
+                final district = value['district'] ?? 'Unknown'; // ADDED
+                districtSet.add(district); // ADDED
                 fetchedPosts.add(
                   Post(
                     userId: userId,
@@ -84,7 +88,7 @@ class _WorkerpageState extends State<Workerpage> {
                     description: value['description'] ?? '',
                     imageBase64: value['imageBase64'] ?? '',
                     orderId: value['orderId'] ?? '',
-                    district: district,
+                    district: district, // ADDED
                   ),
                 );
               }
@@ -92,17 +96,51 @@ class _WorkerpageState extends State<Workerpage> {
           }
         });
       }
-
       fetchedPosts.sort((a, b) => b.postId.compareTo(a.postId));
       setState(() {
         posts = fetchedPosts;
         isLoading = false;
-        availableDistricts = ['All', ...districtSet.toList()..sort()];
+        availableDistricts = ['All', ...districtSet.toList()..sort()]; // ADDED
       });
     } catch (e) {
       print("Failed to load posts: $e");
       setState(() => isLoading = false);
     }
+  }
+
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final XFile? image = await showModalBottomSheet<XFile?>(
+      context: context,
+      builder:
+          (context) => SafeArea(
+            child: Wrap(
+              children: [
+                ListTile(
+                  leading: Icon(Icons.camera_alt),
+                  title: Text('Take Photo'),
+                  onTap: () async {
+                    final picked = await picker.pickImage(
+                      source: ImageSource.camera,
+                    );
+                    Navigator.pop(context, picked);
+                  },
+                ),
+                ListTile(
+                  leading: Icon(Icons.photo_library),
+                  title: Text('Choose from Gallery'),
+                  onTap: () async {
+                    final picked = await picker.pickImage(
+                      source: ImageSource.gallery,
+                    );
+                    Navigator.pop(context, picked);
+                  },
+                ),
+              ],
+            ),
+          ),
+    );
+    if (image != null) setState(() => userData.profileImage = image.path);
   }
 
   Future<void> _applyForJob(String jobProviderUserId, String postId) async {
@@ -115,6 +153,23 @@ class _WorkerpageState extends State<Workerpage> {
     }
 
     try {
+      final workerUserId = userData.userId;
+      final workerDetails = {
+        'workerUserId': workerUserId,
+        'name': userData.name,
+        'phoneNumber': userData.phoneNumber,
+        'experience': userData.experience ?? 'Not provided',
+        'role': userData.role,
+        'gender': userData.gender,
+        'dob': userData.dob?.toLocal().toString().split(' ')[0] ?? 'Not Set',
+        'country': userData.country,
+        'state': userData.state,
+        'district': userData.district,
+        'city': userData.city,
+        'area': userData.area,
+        'address': userData.address,
+      };
+
       final post = posts.firstWhere(
         (p) => p.postId == postId && p.userId == jobProviderUserId,
         orElse:
@@ -133,22 +188,9 @@ class _WorkerpageState extends State<Workerpage> {
         );
         return;
       }
-
-      final workerDetails = {
-        'workerUserId': userData.userId,
-        'name': userData.name,
-        'phoneNumber': userData.phoneNumber,
-        'experience': userData.experience ?? 'Not provided',
-        'role': userData.role,
-        'gender': userData.gender,
-        'dob': userData.dob?.toLocal().toString().split(' ')[0] ?? 'Not Set',
-        'country': userData.country,
-        'state': userData.state,
-        'district': userData.district,
-        'city': userData.city,
-        'area': userData.area,
-        'address': userData.address,
-      };
+      await FirebaseDatabase.instance
+          .ref('applications/$jobProviderUserId/$postId/${userData.userId}')
+          .set(workerDetails);
 
       final appliedJobDetails = {
         'orderId': post.orderId,
@@ -157,10 +199,6 @@ class _WorkerpageState extends State<Workerpage> {
         'status': 'applied',
         'appliedAt': DateTime.now().toIso8601String(),
       };
-
-      await FirebaseDatabase.instance
-          .ref('applications/$jobProviderUserId/$postId/${userData.userId}')
-          .set(workerDetails);
       await FirebaseDatabase.instance
           .ref('appliedJobs/${userData.userId}/$jobProviderUserId/$postId')
           .set(appliedJobDetails);
@@ -178,16 +216,29 @@ class _WorkerpageState extends State<Workerpage> {
     }
   }
 
+  Widget _buildMainContent() {
+    if (_selectedIndex == 0) {
+      return buildJobPosts();
+    } else {
+      return JobStatusPage(userData: userData);
+    }
+  }
+
   Widget buildJobPosts() {
     final filteredPosts =
         (selectedDistrict == 'All')
             ? posts
-            : posts.where((p) => p.district == selectedDistrict).toList();
+            : posts
+                .where((p) => p.district == selectedDistrict)
+                .toList(); // ADDED
 
     return isLoading
         ? Center(child: CircularProgressIndicator())
+        : filteredPosts.isEmpty
+        ? Center(child: Text("No jobs available."))
         : Column(
           children: [
+            // ADDED: District Filter Dropdown
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               child: DropdownButton<String>(
@@ -203,154 +254,143 @@ class _WorkerpageState extends State<Workerpage> {
               ),
             ),
             Expanded(
-              child:
-                  filteredPosts.isEmpty
-                      ? Center(child: Text("No jobs available."))
-                      : ListView.builder(
-                        padding: const EdgeInsets.all(12),
-                        itemCount: filteredPosts.length,
-                        itemBuilder: (context, index) {
-                          final post = filteredPosts[index];
-                          final isApplied = appliedJobs[post.postId] ?? false;
+              child: ListView.builder(
+                padding: const EdgeInsets.all(12),
+                itemCount: filteredPosts.length,
+                itemBuilder: (context, index) {
+                  final post = filteredPosts[index];
+                  final isApplied = appliedJobs[post.postId] ?? false;
 
-                          return Card(
-                            color: Color(0xFFF2F2F2),
-                            margin: const EdgeInsets.only(bottom: 16),
-                            elevation: 4,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                  return Card(
+                    color: Color(0xFFF2F2F2),
+                    margin: const EdgeInsets.only(bottom: 16),
+                    elevation: 4,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "Job Provider Id: ${post.userId}",
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blueAccent,
                             ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    "Job Provider Id: ${post.userId}",
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.blueAccent,
-                                    ),
-                                  ),
-                                  SizedBox(height: 4),
-                                  Text(
-                                    "District: ${post.district}",
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  SizedBox(height: 8),
-                                  Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      if (post.imageBase64.isNotEmpty)
-                                        GestureDetector(
-                                          onTap: () {
-                                            Navigator.push(
-                                              context,
-                                              MaterialPageRoute(
-                                                builder:
-                                                    (_) => Scaffold(
-                                                      appBar: AppBar(
-                                                        backgroundColor:
-                                                            Colors.black,
-                                                      ),
-                                                      backgroundColor:
-                                                          Colors.black,
-                                                      body: Center(
-                                                        child: InteractiveViewer(
-                                                          child: Image.memory(
-                                                            base64Decode(
-                                                              post.imageBase64,
-                                                            ),
-                                                            fit: BoxFit.contain,
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            "District: ${post.district}", // ADDED
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          SizedBox(height: 8),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (post.imageBase64.isNotEmpty)
+                                GestureDetector(
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder:
+                                            (_) => Scaffold(
+                                              appBar: AppBar(
+                                                backgroundColor: Colors.black,
+                                                iconTheme: IconThemeData(
+                                                  color: Colors.white,
+                                                ),
                                               ),
-                                            );
-                                          },
-                                          child: ClipRRect(
+                                              backgroundColor: Colors.black,
+                                              body: Center(
+                                                child: InteractiveViewer(
+                                                  child: Image.memory(
+                                                    base64Decode(
+                                                      post.imageBase64,
+                                                    ),
+                                                    fit: BoxFit.contain,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                      ),
+                                    );
+                                  },
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: Image.memory(
+                                      base64Decode(post.imageBase64),
+                                      height: 100,
+                                      width: 100,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                ),
+                              SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      post.description,
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        color: Colors.black87,
+                                      ),
+                                    ),
+                                    SizedBox(height: 12),
+                                    Align(
+                                      alignment: Alignment.centerRight,
+                                      child: ElevatedButton.icon(
+                                        onPressed:
+                                            isApplied
+                                                ? null
+                                                : () => _applyForJob(
+                                                  post.userId,
+                                                  post.postId,
+                                                ),
+                                        icon: Icon(
+                                          Icons.work,
+                                          color: Colors.white,
+                                        ),
+                                        label: Text(
+                                          isApplied ? "Applied" : "Apply Now",
+                                          style: TextStyle(color: Colors.white),
+                                        ),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor:
+                                              isApplied
+                                                  ? Colors.grey
+                                                  : Colors.blue,
+                                          shape: RoundedRectangleBorder(
                                             borderRadius: BorderRadius.circular(
                                               10,
                                             ),
-                                            child: Image.memory(
-                                              base64Decode(post.imageBase64),
-                                              height: 100,
-                                              width: 100,
-                                              fit: BoxFit.cover,
-                                            ),
+                                          ),
+                                          padding: EdgeInsets.symmetric(
+                                            horizontal: 16,
+                                            vertical: 10,
                                           ),
                                         ),
-                                      SizedBox(width: 12),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              post.description,
-                                              style: TextStyle(
-                                                fontSize: 16,
-                                                color: Colors.black87,
-                                              ),
-                                            ),
-                                            SizedBox(height: 12),
-                                            Align(
-                                              alignment: Alignment.centerRight,
-                                              child: ElevatedButton.icon(
-                                                onPressed:
-                                                    isApplied
-                                                        ? null
-                                                        : () => _applyForJob(
-                                                          post.userId,
-                                                          post.postId,
-                                                        ),
-                                                icon: Icon(
-                                                  Icons.work,
-                                                  color: Colors.white,
-                                                ),
-                                                label: Text(
-                                                  isApplied
-                                                      ? "Applied"
-                                                      : "Apply Now",
-                                                  style: TextStyle(
-                                                    color: Colors.white,
-                                                  ),
-                                                ),
-                                                style: ElevatedButton.styleFrom(
-                                                  backgroundColor:
-                                                      isApplied
-                                                          ? Colors.grey
-                                                          : Colors.blue,
-                                                  shape: RoundedRectangleBorder(
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          10,
-                                                        ),
-                                                  ),
-                                                  padding: EdgeInsets.symmetric(
-                                                    horizontal: 16,
-                                                    vertical: 10,
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
                                       ),
-                                    ],
-                                  ),
-                                ],
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          );
-                        },
+                            ],
+                          ),
+                        ],
                       ),
+                    ),
+                  );
+                },
+              ),
             ),
           ],
         );
@@ -358,11 +398,169 @@ class _WorkerpageState extends State<Workerpage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('Worker Page')),
-      body: buildJobPosts(),
+    final backController = Get.put(BackButtonController());
+    final scaffoldKey = GlobalKey<ScaffoldState>();
+
+    return WillPopScope(
+      onWillPop: backController.handleWillPop,
+      child: Scaffold(
+        key: scaffoldKey,
+        appBar: AppBar(
+          title: Text(
+            _selectedIndex == 0 ? 'Welcome, ${userData.name}' : 'Job Status',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+              fontSize: 25,
+            ),
+          ),
+          backgroundColor: Colors.blueAccent,
+          leading: IconButton(
+            icon: _buildProfileAvatar(radius: 20),
+            onPressed: () => scaffoldKey.currentState?.openDrawer(),
+          ),
+        ),
+        drawer: buildDrawer(),
+        body: _buildMainContent(),
+        bottomNavigationBar: BottomNavigationBar(
+          currentIndex: _selectedIndex,
+          selectedItemColor: Colors.blueAccent,
+          onTap: (index) => setState(() => _selectedIndex = index),
+          items: const [
+            BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.assignment),
+              label: 'Job Status',
+            ),
+          ],
+        ),
+      ),
     );
   }
+
+  Drawer buildDrawer() {
+    return Drawer(
+      child: ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          UserAccountsDrawerHeader(
+            accountName: Text(
+              userData.name,
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            accountEmail: Text(userData.phoneNumber),
+            currentAccountPicture: Stack(
+              children: [
+                _buildProfileAvatar(radius: 40),
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: GestureDetector(
+                    onTap: _pickImage,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                      padding: EdgeInsets.all(3),
+                      child: Icon(
+                        Icons.edit,
+                        size: 18,
+                        color: Colors.blueAccent,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            decoration: BoxDecoration(color: Colors.blueAccent),
+          ),
+          ListTile(
+            leading: Icon(Icons.logout),
+            title: Text('Logout'),
+            onTap: () async {
+              final shouldLogout = await Get.dialog(
+                AlertDialog(
+                  title: Text("Confirm Logout"),
+                  content: Text("Are you sure you want to logout?"),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Get.back(result: false),
+                      child: Text("Cancel"),
+                    ),
+                    TextButton(
+                      onPressed: () => Get.back(result: true),
+                      child: Text("Confirm"),
+                    ),
+                  ],
+                ),
+              );
+              if (shouldLogout == true) {
+                SharedPreferences prefs = await SharedPreferences.getInstance();
+                await prefs.setBool('isLoggedIn', false);
+                Get.offAll(() => LoginScreen());
+              }
+            },
+          ),
+          Divider(),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Text(
+              'Profile Details',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+          _buildProfileDetail('User Id', userData.userId),
+          _buildProfileDetail('Role', userData.role),
+          _buildProfileDetail('Gender', userData.gender),
+          _buildProfileDetail(
+            'DOB',
+            userData.dob?.toLocal().toString().split(' ')[0] ?? 'Not Set',
+          ),
+          _buildProfileDetail('Phone', userData.phoneNumber),
+          _buildProfileDetail('Country', userData.country),
+          _buildProfileDetail('State', userData.state),
+          _buildProfileDetail('District', userData.district),
+          _buildProfileDetail('City', userData.city),
+          _buildProfileDetail('Area', userData.area),
+          _buildProfileDetail('Address', userData.address),
+          if (userData.role == 'Worker')
+            _buildProfileDetail('Experience', userData.experience ?? ''),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProfileAvatar({required double radius}) {
+    if (userData.profileImage != null && userData.profileImage!.isNotEmpty) {
+      return CircleAvatar(
+        backgroundImage: FileImage(File(userData.profileImage!)),
+        radius: radius,
+      );
+    }
+    return CircleAvatar(
+      backgroundColor: Colors.grey[300],
+      radius: radius,
+      child: Text(
+        userData.name.isNotEmpty ? userData.name[0].toUpperCase() : '?',
+        style: TextStyle(fontSize: radius, color: Colors.blue),
+      ),
+    );
+  }
+
+  Widget _buildProfileDetail(String label, String value) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 16.0),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          '$label:',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        ),
+        Text(value, style: TextStyle(fontSize: 16)),
+      ],
+    ),
+  );
 }
 
 class Post {
@@ -371,13 +569,13 @@ class Post {
   final String description;
   final String imageBase64;
   final String orderId;
-  final String district;
+  final String district; // ADDED
   Post({
     required this.userId,
     required this.postId,
     required this.description,
     required this.imageBase64,
     required this.orderId,
-    required this.district,
+    required this.district, // ADDED
   });
 }
