@@ -1,3 +1,4 @@
+// import statements
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -6,7 +7,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
 import '../login/Login.dart';
 import '../screens/user_data.dart';
 import 'Backcontroll.dart';
@@ -23,10 +23,9 @@ class Workerpage extends StatefulWidget {
 class _WorkerpageState extends State<Workerpage> {
   late UserData userData;
   int _selectedIndex = 0;
-  Map<String, bool> appliedJobs = {};
   List<Post> posts = [];
   bool isLoading = true;
-
+  Map<String, bool> appliedJobs = {};
   String selectedDistrict = 'All';
   List<String> availableDistricts = ['All'];
 
@@ -71,29 +70,30 @@ class _WorkerpageState extends State<Workerpage> {
       Set<String> districtSet = {};
 
       if (snapshot.exists) {
-        final workersData = Map<String, dynamic>.from(snapshot.value as Map);
+        final workersData = snapshot.value as Map<dynamic, dynamic>;
         workersData.forEach((userId, postsData) {
-          final postList = Map<String, dynamic>.from(postsData);
-          postList.forEach((key, value) {
-            final postData = Map<String, dynamic>.from(value);
-            final district = postData['district'] ?? 'Unknown';
-            districtSet.add(district);
-            fetchedPosts.add(
-              Post(
-                userId: userId,
-                postId: key,
-                description: postData['description'] ?? '',
-                imageBase64: postData['imageBase64'] ?? '',
-                orderId: postData['orderId'] ?? '',
-                district: district,
-              ),
-            );
-          });
+          if (postsData is Map<dynamic, dynamic>) {
+            postsData.forEach((key, value) {
+              if (value is Map<dynamic, dynamic>) {
+                final district = value['district'] ?? 'Unknown';
+                districtSet.add(district);
+                fetchedPosts.add(
+                  Post(
+                    userId: userId,
+                    postId: key,
+                    description: value['description'] ?? '',
+                    imageBase64: value['imageBase64'] ?? '',
+                    orderId: value['orderId'] ?? '',
+                    district: district,
+                  ),
+                );
+              }
+            });
+          }
         });
       }
 
       fetchedPosts.sort((a, b) => b.postId.compareTo(a.postId));
-
       setState(() {
         posts = fetchedPosts;
         isLoading = false;
@@ -105,64 +105,32 @@ class _WorkerpageState extends State<Workerpage> {
     }
   }
 
-  Future<void> _pickImage() async {
-    final picker = ImagePicker();
-    final XFile? image = await showModalBottomSheet<XFile?>(
-      context: context,
-      builder:
-          (context) => SafeArea(
-            child: Wrap(
-              children: [
-                ListTile(
-                  leading: Icon(Icons.camera_alt),
-                  title: Text('Take Photo'),
-                  onTap: () async {
-                    final picked = await picker.pickImage(
-                      source: ImageSource.camera,
-                    );
-                    Navigator.pop(context, picked);
-                  },
-                ),
-                ListTile(
-                  leading: Icon(Icons.photo_library),
-                  title: Text('Choose from Gallery'),
-                  onTap: () async {
-                    final picked = await picker.pickImage(
-                      source: ImageSource.gallery,
-                    );
-                    Navigator.pop(context, picked);
-                  },
-                ),
-              ],
-            ),
-          ),
-    );
-    if (image != null) {
-      setState(() {
-        userData.profileImage = image.path;
-      });
-    }
-  }
-
   Future<void> _applyForJob(String jobProviderUserId, String postId) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Please log in to apply")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please log in to apply for jobs")),
+      );
       return;
     }
 
     try {
       final post = posts.firstWhere(
         (p) => p.postId == postId && p.userId == jobProviderUserId,
-        orElse: () => Post.empty(),
+        orElse:
+            () => Post(
+              userId: '',
+              postId: '',
+              orderId: '',
+              description: '',
+              imageBase64: '',
+              district: '',
+            ),
       );
-
-      if (post.postId.isEmpty) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text("Post not found")));
+      if (post.postId.isEmpty || post.userId.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Post not found or invalid")),
+        );
         return;
       }
 
@@ -173,7 +141,7 @@ class _WorkerpageState extends State<Workerpage> {
         'experience': userData.experience ?? 'Not provided',
         'role': userData.role,
         'gender': userData.gender,
-        'dob': userData.dob?.toIso8601String() ?? '',
+        'dob': userData.dob?.toLocal().toString().split(' ')[0] ?? 'Not Set',
         'country': userData.country,
         'state': userData.state,
         'district': userData.district,
@@ -182,90 +150,46 @@ class _WorkerpageState extends State<Workerpage> {
         'address': userData.address,
       };
 
+      final appliedJobDetails = {
+        'orderId': post.orderId,
+        'description': post.description,
+        'imageBase64': post.imageBase64,
+        'status': 'applied',
+        'appliedAt': DateTime.now().toIso8601String(),
+      };
+
       await FirebaseDatabase.instance
           .ref('applications/$jobProviderUserId/$postId/${userData.userId}')
           .set(workerDetails);
-
       await FirebaseDatabase.instance
           .ref('appliedJobs/${userData.userId}/$jobProviderUserId/$postId')
-          .set({
-            'orderId': post.orderId,
-            'description': post.description,
-            'imageBase64': post.imageBase64,
-            'status': 'applied',
-            'appliedAt': DateTime.now().toIso8601String(),
-          });
+          .set(appliedJobDetails);
 
       setState(() => appliedJobs[postId] = true);
       await _saveAppliedJob(postId);
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Applied successfully!")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Successfully applied to the job!")),
+      );
     } catch (e) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text("Apply failed: $e")));
+      ).showSnackBar(SnackBar(content: Text("Failed to apply to the job: $e")));
     }
   }
 
-  Widget buildDrawer() {
-    return Drawer(
-      child: ListView(
-        children: [
-          DrawerHeader(
-            decoration: BoxDecoration(color: Colors.blueAccent),
-            child: Text(
-              "Hello, ${userData.name}",
-              style: TextStyle(color: Colors.white, fontSize: 20),
-            ),
-          ),
-          ListTile(
-            leading: Icon(Icons.logout),
-            title: Text("Logout"),
-            onTap: () {
-              FirebaseAuth.instance.signOut();
-              Get.offAll(() => LoginScreen());
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProfileAvatar({double radius = 20}) {
-    final imageFile = userData.profileImage;
-    return CircleAvatar(
-      radius: radius,
-      backgroundImage:
-          imageFile != null &&
-                  imageFile.isNotEmpty &&
-                  File(imageFile).existsSync()
-              ? FileImage(File(imageFile))
-              : AssetImage('assets/default_avatar.png') as ImageProvider,
-    );
-  }
-
-  Widget _buildMainContent() {
-    return _selectedIndex == 0
-        ? buildJobPosts()
-        : JobStatusPage(userData: userData);
-  }
-
   Widget buildJobPosts() {
-    final filtered =
-        selectedDistrict == 'All'
+    final filteredPosts =
+        (selectedDistrict == 'All')
             ? posts
             : posts.where((p) => p.district == selectedDistrict).toList();
 
     return isLoading
         ? Center(child: CircularProgressIndicator())
-        : filtered.isEmpty
-        ? Center(child: Text("No jobs available."))
         : Column(
           children: [
             Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               child: DropdownButton<String>(
                 value: selectedDistrict,
                 isExpanded: true,
@@ -273,70 +197,160 @@ class _WorkerpageState extends State<Workerpage> {
                     availableDistricts
                         .map((d) => DropdownMenuItem(value: d, child: Text(d)))
                         .toList(),
-                onChanged: (v) {
-                  if (v != null) setState(() => selectedDistrict = v);
+                onChanged: (value) {
+                  if (value != null) setState(() => selectedDistrict = value);
                 },
               ),
             ),
             Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.all(12),
-                itemCount: filtered.length,
-                itemBuilder: (context, i) {
-                  final post = filtered[i];
-                  final isApplied = appliedJobs[post.postId] ?? false;
+              child:
+                  filteredPosts.isEmpty
+                      ? Center(child: Text("No jobs available."))
+                      : ListView.builder(
+                        padding: const EdgeInsets.all(12),
+                        itemCount: filteredPosts.length,
+                        itemBuilder: (context, index) {
+                          final post = filteredPosts[index];
+                          final isApplied = appliedJobs[post.postId] ?? false;
 
-                  return Card(
-                    color: Color(0xFFF2F2F2),
-                    margin: const EdgeInsets.only(bottom: 16),
-                    elevation: 4,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "Job Provider ID: ${post.userId}",
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.blueAccent,
+                          return Card(
+                            color: Color(0xFFF2F2F2),
+                            margin: const EdgeInsets.only(bottom: 16),
+                            elevation: 4,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                          ),
-                          SizedBox(height: 6),
-                          Text("District: ${post.district}"),
-                          SizedBox(height: 6),
-                          if (post.imageBase64.isNotEmpty)
-                            Image.memory(
-                              base64Decode(post.imageBase64),
-                              height: 100,
-                              width: double.infinity,
-                              fit: BoxFit.cover,
-                            ),
-                          SizedBox(height: 8),
-                          Text(post.description),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: ElevatedButton.icon(
-                              onPressed:
-                                  isApplied
-                                      ? null
-                                      : () => _applyForJob(
-                                        post.userId,
-                                        post.postId,
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    "Job Provider Id: ${post.userId}",
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.blueAccent,
+                                    ),
+                                  ),
+                                  SizedBox(height: 4),
+                                  Text(
+                                    "District: ${post.district}",
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  SizedBox(height: 8),
+                                  Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      if (post.imageBase64.isNotEmpty)
+                                        GestureDetector(
+                                          onTap: () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder:
+                                                    (_) => Scaffold(
+                                                      appBar: AppBar(
+                                                        backgroundColor:
+                                                            Colors.black,
+                                                      ),
+                                                      backgroundColor:
+                                                          Colors.black,
+                                                      body: Center(
+                                                        child: InteractiveViewer(
+                                                          child: Image.memory(
+                                                            base64Decode(
+                                                              post.imageBase64,
+                                                            ),
+                                                            fit: BoxFit.contain,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                              ),
+                                            );
+                                          },
+                                          child: ClipRRect(
+                                            borderRadius: BorderRadius.circular(
+                                              10,
+                                            ),
+                                            child: Image.memory(
+                                              base64Decode(post.imageBase64),
+                                              height: 100,
+                                              width: 100,
+                                              fit: BoxFit.cover,
+                                            ),
+                                          ),
+                                        ),
+                                      SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              post.description,
+                                              style: TextStyle(
+                                                fontSize: 16,
+                                                color: Colors.black87,
+                                              ),
+                                            ),
+                                            SizedBox(height: 12),
+                                            Align(
+                                              alignment: Alignment.centerRight,
+                                              child: ElevatedButton.icon(
+                                                onPressed:
+                                                    isApplied
+                                                        ? null
+                                                        : () => _applyForJob(
+                                                          post.userId,
+                                                          post.postId,
+                                                        ),
+                                                icon: Icon(
+                                                  Icons.work,
+                                                  color: Colors.white,
+                                                ),
+                                                label: Text(
+                                                  isApplied
+                                                      ? "Applied"
+                                                      : "Apply Now",
+                                                  style: TextStyle(
+                                                    color: Colors.white,
+                                                  ),
+                                                ),
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor:
+                                                      isApplied
+                                                          ? Colors.grey
+                                                          : Colors.blue,
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          10,
+                                                        ),
+                                                  ),
+                                                  padding: EdgeInsets.symmetric(
+                                                    horizontal: 16,
+                                                    vertical: 10,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ),
-                              icon: Icon(Icons.send),
-                              label: Text(isApplied ? 'Applied' : 'Apply Now'),
+                                    ],
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
+                          );
+                        },
                       ),
-                    ),
-                  );
-                },
-              ),
             ),
           ],
         );
@@ -344,39 +358,9 @@ class _WorkerpageState extends State<Workerpage> {
 
   @override
   Widget build(BuildContext context) {
-    final backController = Get.put(BackButtonController());
-    final scaffoldKey = GlobalKey<ScaffoldState>();
-
-    return WillPopScope(
-      onWillPop: backController.handleWillPop,
-      child: Scaffold(
-        key: scaffoldKey,
-        appBar: AppBar(
-          title: Text(
-            _selectedIndex == 0 ? 'Welcome, ${userData.name}' : 'Job Status',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-          backgroundColor: Colors.blueAccent,
-          leading: IconButton(
-            icon: _buildProfileAvatar(radius: 18),
-            onPressed: () => scaffoldKey.currentState?.openDrawer(),
-          ),
-        ),
-        drawer: buildDrawer(),
-        body: _buildMainContent(),
-        bottomNavigationBar: BottomNavigationBar(
-          currentIndex: _selectedIndex,
-          onTap: (i) => setState(() => _selectedIndex = i),
-          selectedItemColor: Colors.blueAccent,
-          items: const [
-            BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.assignment),
-              label: 'Job Status',
-            ),
-          ],
-        ),
-      ),
+    return Scaffold(
+      appBar: AppBar(title: Text('Worker Page')),
+      body: buildJobPosts(),
     );
   }
 }
@@ -388,7 +372,6 @@ class Post {
   final String imageBase64;
   final String orderId;
   final String district;
-
   Post({
     required this.userId,
     required this.postId,
@@ -397,13 +380,4 @@ class Post {
     required this.orderId,
     required this.district,
   });
-
-  factory Post.empty() => Post(
-    userId: '',
-    postId: '',
-    description: '',
-    imageBase64: '',
-    orderId: '',
-    district: '',
-  );
 }
