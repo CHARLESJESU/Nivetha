@@ -1,4 +1,3 @@
-// import statements remain unchanged
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -7,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import '../login/Login.dart';
 import '../screens/user_data.dart';
 import 'Backcontroll.dart';
@@ -23,19 +23,19 @@ class Workerpage extends StatefulWidget {
 class _WorkerpageState extends State<Workerpage> {
   late UserData userData;
   int _selectedIndex = 0;
-  int _backPressCounter = 0;
-  DateTime? _lastBackPressed;
-
+  Map<String, bool> appliedJobs = {};
   List<Post> posts = [];
   bool isLoading = true;
-  Map<String, bool> appliedJobs = {};
+
+  String selectedDistrict = 'All';
+  List<String> availableDistricts = ['All'];
 
   @override
   void initState() {
     super.initState();
     userData = widget.userData;
     _initializePreferences();
-    _loadAppliedJobs(); // ✅ Load previously applied jobs
+    _loadAppliedJobs();
     _loadPosts();
   }
 
@@ -68,30 +68,36 @@ class _WorkerpageState extends State<Workerpage> {
       final postsRef = FirebaseDatabase.instance.ref().child('jobs/workers');
       final snapshot = await postsRef.get();
       List<Post> fetchedPosts = [];
+      Set<String> districtSet = {};
+
       if (snapshot.exists) {
-        final workersData = snapshot.value as Map<dynamic, dynamic>;
+        final workersData = Map<String, dynamic>.from(snapshot.value as Map);
         workersData.forEach((userId, postsData) {
-          if (postsData is Map<dynamic, dynamic>) {
-            postsData.forEach((key, value) {
-              if (value is Map<dynamic, dynamic>) {
-                fetchedPosts.add(
-                  Post(
-                    userId: userId,
-                    postId: key,
-                    description: value['description'] ?? '',
-                    imageBase64: value['imageBase64'] ?? '',
-                    orderId: value['orderId'] ?? '',
-                  ),
-                );
-              }
-            });
-          }
+          final postList = Map<String, dynamic>.from(postsData);
+          postList.forEach((key, value) {
+            final postData = Map<String, dynamic>.from(value);
+            final district = postData['district'] ?? 'Unknown';
+            districtSet.add(district);
+            fetchedPosts.add(
+              Post(
+                userId: userId,
+                postId: key,
+                description: postData['description'] ?? '',
+                imageBase64: postData['imageBase64'] ?? '',
+                orderId: postData['orderId'] ?? '',
+                district: district,
+              ),
+            );
+          });
         });
       }
+
       fetchedPosts.sort((a, b) => b.postId.compareTo(a.postId));
+
       setState(() {
         posts = fetchedPosts;
         isLoading = false;
+        availableDistricts = ['All', ...districtSet.toList()..sort()];
       });
     } catch (e) {
       print("Failed to load posts: $e");
@@ -131,29 +137,43 @@ class _WorkerpageState extends State<Workerpage> {
             ),
           ),
     );
-    if (image != null) setState(() => userData.profileImage = image.path);
+    if (image != null) {
+      setState(() {
+        userData.profileImage = image.path;
+      });
+    }
   }
 
   Future<void> _applyForJob(String jobProviderUserId, String postId) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please log in to apply for jobs")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Please log in to apply")));
       return;
     }
 
     try {
-      final workerUserId = userData.userId;
+      final post = posts.firstWhere(
+        (p) => p.postId == postId && p.userId == jobProviderUserId,
+        orElse: () => Post.empty(),
+      );
+
+      if (post.postId.isEmpty) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Post not found")));
+        return;
+      }
 
       final workerDetails = {
-        'workerUserId': workerUserId,
+        'workerUserId': userData.userId,
         'name': userData.name,
         'phoneNumber': userData.phoneNumber,
         'experience': userData.experience ?? 'Not provided',
         'role': userData.role,
         'gender': userData.gender,
-        'dob': userData.dob?.toLocal().toString().split(' ')[0] ?? 'Not Set',
+        'dob': userData.dob?.toIso8601String() ?? '',
         'country': userData.country,
         'state': userData.state,
         'district': userData.district,
@@ -162,186 +182,163 @@ class _WorkerpageState extends State<Workerpage> {
         'address': userData.address,
       };
 
-      final post = posts.firstWhere(
-        (p) => p.postId == postId && p.userId == jobProviderUserId,
-        orElse:
-            () => Post(
-              userId: '',
-              postId: '',
-              orderId: '',
-              description: '',
-              imageBase64: '',
-            ),
-      );
-
-      if (post.postId.isEmpty || post.userId.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Post not found or invalid")),
-        );
-        return;
-      }
-
       await FirebaseDatabase.instance
-          .ref('applications/$jobProviderUserId/$postId/$workerUserId')
+          .ref('applications/$jobProviderUserId/$postId/${userData.userId}')
           .set(workerDetails);
 
-      final appliedJobDetails = {
-        'orderId': post.orderId,
-        'description': post.description,
-        'imageBase64': post.imageBase64,
-        'status': 'applied',
-        'appliedAt': DateTime.now().toIso8601String(),
-      };
-
       await FirebaseDatabase.instance
-          .ref('appliedJobs/$workerUserId/$jobProviderUserId/$postId')
-          .set(appliedJobDetails);
+          .ref('appliedJobs/${userData.userId}/$jobProviderUserId/$postId')
+          .set({
+            'orderId': post.orderId,
+            'description': post.description,
+            'imageBase64': post.imageBase64,
+            'status': 'applied',
+            'appliedAt': DateTime.now().toIso8601String(),
+          });
 
       setState(() => appliedJobs[postId] = true);
-      await _saveAppliedJob(postId); // ✅ Save applied job locally
+      await _saveAppliedJob(postId);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Successfully applied to the job!")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Applied successfully!")));
     } catch (e) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text("Failed to apply to the job: $e")));
+      ).showSnackBar(SnackBar(content: Text("Apply failed: $e")));
     }
+  }
+
+  Widget buildDrawer() {
+    return Drawer(
+      child: ListView(
+        children: [
+          DrawerHeader(
+            decoration: BoxDecoration(color: Colors.blueAccent),
+            child: Text(
+              "Hello, ${userData.name}",
+              style: TextStyle(color: Colors.white, fontSize: 20),
+            ),
+          ),
+          ListTile(
+            leading: Icon(Icons.logout),
+            title: Text("Logout"),
+            onTap: () {
+              FirebaseAuth.instance.signOut();
+              Get.offAll(() => LoginScreen());
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProfileAvatar({double radius = 20}) {
+    final imageFile = userData.profileImage;
+    return CircleAvatar(
+      radius: radius,
+      backgroundImage:
+          imageFile != null &&
+                  imageFile.isNotEmpty &&
+                  File(imageFile).existsSync()
+              ? FileImage(File(imageFile))
+              : AssetImage('assets/default_avatar.png') as ImageProvider,
+    );
   }
 
   Widget _buildMainContent() {
-    if (_selectedIndex == 0) {
-      return buildJobPosts();
-    } else {
-      return JobStatusPage(userData: userData);
-    }
+    return _selectedIndex == 0
+        ? buildJobPosts()
+        : JobStatusPage(userData: userData);
   }
 
   Widget buildJobPosts() {
+    final filtered =
+        selectedDistrict == 'All'
+            ? posts
+            : posts.where((p) => p.district == selectedDistrict).toList();
+
     return isLoading
         ? Center(child: CircularProgressIndicator())
-        : posts.isEmpty
+        : filtered.isEmpty
         ? Center(child: Text("No jobs available."))
-        : ListView.builder(
-          padding: const EdgeInsets.all(12),
-          itemCount: posts.length,
-          itemBuilder: (context, index) {
-            final post = posts[index];
-            final isApplied = appliedJobs[post.postId] ?? false;
-
-            return Card(
-              color: Color(0xFFF2F2F2),
-              margin: const EdgeInsets.only(bottom: 16),
-              elevation: 4,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+        : Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: DropdownButton<String>(
+                value: selectedDistrict,
+                isExpanded: true,
+                items:
+                    availableDistricts
+                        .map((d) => DropdownMenuItem(value: d, child: Text(d)))
+                        .toList(),
+                onChanged: (v) {
+                  if (v != null) setState(() => selectedDistrict = v);
+                },
               ),
-              child: Padding(
+            ),
+            Expanded(
+              child: ListView.builder(
                 padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "Job Provider Id: ${post.userId}",
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blueAccent,
-                      ),
+                itemCount: filtered.length,
+                itemBuilder: (context, i) {
+                  final post = filtered[i];
+                  final isApplied = appliedJobs[post.postId] ?? false;
+
+                  return Card(
+                    color: Color(0xFFF2F2F2),
+                    margin: const EdgeInsets.only(bottom: 16),
+                    elevation: 4,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    SizedBox(height: 8),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (post.imageBase64.isNotEmpty)
-                          GestureDetector(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder:
-                                      (_) => Scaffold(
-                                        appBar: AppBar(
-                                          backgroundColor: Colors.black,
-                                          iconTheme: IconThemeData(
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                        backgroundColor: Colors.black,
-                                        body: Center(
-                                          child: InteractiveViewer(
-                                            child: Image.memory(
-                                              base64Decode(post.imageBase64),
-                                              fit: BoxFit.contain,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                ),
-                              );
-                            },
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(10),
-                              child: Image.memory(
-                                base64Decode(post.imageBase64),
-                                height: 100,
-                                width: 100,
-                                fit: BoxFit.cover,
-                              ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "Job Provider ID: ${post.userId}",
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blueAccent,
                             ),
                           ),
-                        SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                post.description,
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.black87,
-                                ),
-                              ),
-                              SizedBox(height: 12),
-                              Align(
-                                alignment: Alignment.centerRight,
-                                child: ElevatedButton.icon(
-                                  onPressed:
-                                      isApplied
-                                          ? null
-                                          : () => _applyForJob(
-                                            post.userId,
-                                            post.postId,
-                                          ),
-                                  icon: Icon(Icons.work, color: Colors.white),
-                                  label: Text(
-                                    isApplied ? "Applied" : "Apply Now",
-                                    style: TextStyle(color: Colors.white),
-                                  ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor:
-                                        isApplied ? Colors.grey : Colors.blue,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: 16,
-                                      vertical: 10,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
+                          SizedBox(height: 6),
+                          Text("District: ${post.district}"),
+                          SizedBox(height: 6),
+                          if (post.imageBase64.isNotEmpty)
+                            Image.memory(
+                              base64Decode(post.imageBase64),
+                              height: 100,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                            ),
+                          SizedBox(height: 8),
+                          Text(post.description),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: ElevatedButton.icon(
+                              onPressed:
+                                  isApplied
+                                      ? null
+                                      : () => _applyForJob(
+                                        post.userId,
+                                        post.postId,
+                                      ),
+                              icon: Icon(Icons.send),
+                              label: Text(isApplied ? 'Applied' : 'Apply Now'),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ],
-                ),
+                  );
+                },
               ),
-            );
-          },
+            ),
+          ],
         );
   }
 
@@ -357,15 +354,11 @@ class _WorkerpageState extends State<Workerpage> {
         appBar: AppBar(
           title: Text(
             _selectedIndex == 0 ? 'Welcome, ${userData.name}' : 'Job Status',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-              fontSize: 25,
-            ),
+            style: TextStyle(fontWeight: FontWeight.bold),
           ),
           backgroundColor: Colors.blueAccent,
           leading: IconButton(
-            icon: _buildProfileAvatar(radius: 20),
+            icon: _buildProfileAvatar(radius: 18),
             onPressed: () => scaffoldKey.currentState?.openDrawer(),
           ),
         ),
@@ -373,8 +366,8 @@ class _WorkerpageState extends State<Workerpage> {
         body: _buildMainContent(),
         bottomNavigationBar: BottomNavigationBar(
           currentIndex: _selectedIndex,
+          onTap: (i) => setState(() => _selectedIndex = i),
           selectedItemColor: Colors.blueAccent,
-          onTap: (index) => setState(() => _selectedIndex = index),
           items: const [
             BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
             BottomNavigationBarItem(
@@ -386,130 +379,6 @@ class _WorkerpageState extends State<Workerpage> {
       ),
     );
   }
-
-  Drawer buildDrawer() {
-    return Drawer(
-      child: ListView(
-        padding: EdgeInsets.zero,
-        children: [
-          UserAccountsDrawerHeader(
-            accountName: Text(
-              userData.name,
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            accountEmail: Text(userData.phoneNumber),
-            currentAccountPicture: Stack(
-              children: [
-                _buildProfileAvatar(radius: 40),
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: GestureDetector(
-                    onTap: _pickImage,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                      ),
-                      padding: EdgeInsets.all(3),
-                      child: Icon(
-                        Icons.edit,
-                        size: 18,
-                        color: Colors.blueAccent,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            decoration: BoxDecoration(color: Colors.blueAccent),
-          ),
-          ListTile(
-            leading: Icon(Icons.logout),
-            title: Text('Logout'),
-            onTap: () async {
-              final shouldLogout = await Get.dialog(
-                AlertDialog(
-                  title: Text("Confirm Logout"),
-                  content: Text("Are you sure you want to logout?"),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Get.back(result: false),
-                      child: Text("Cancel"),
-                    ),
-                    TextButton(
-                      onPressed: () => Get.back(result: true),
-                      child: Text("Confirm"),
-                    ),
-                  ],
-                ),
-              );
-              if (shouldLogout == true) {
-                SharedPreferences prefs = await SharedPreferences.getInstance();
-                await prefs.setBool('isLoggedIn', false);
-                Get.offAll(() => LoginScreen());
-              }
-            },
-          ),
-          Divider(),
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Text(
-              'Profile Details',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ),
-          _buildProfileDetail('User Id', userData.userId),
-          _buildProfileDetail('Role', userData.role),
-          _buildProfileDetail('Gender', userData.gender),
-          _buildProfileDetail(
-            'DOB',
-            userData.dob?.toLocal().toString().split(' ')[0] ?? 'Not Set',
-          ),
-          _buildProfileDetail('Phone', userData.phoneNumber),
-          _buildProfileDetail('Country', userData.country),
-          _buildProfileDetail('State', userData.state),
-          _buildProfileDetail('District', userData.district),
-          _buildProfileDetail('City', userData.city),
-          _buildProfileDetail('Area', userData.area),
-          _buildProfileDetail('Address', userData.address),
-          if (userData.role == 'Worker')
-            _buildProfileDetail('Experience', userData.experience ?? ''),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProfileAvatar({required double radius}) {
-    if (userData.profileImage != null && userData.profileImage!.isNotEmpty) {
-      return CircleAvatar(
-        backgroundImage: FileImage(File(userData.profileImage!)),
-        radius: radius,
-      );
-    }
-    return CircleAvatar(
-      backgroundColor: Colors.grey[300],
-      radius: radius,
-      child: Text(
-        userData.name.isNotEmpty ? userData.name[0].toUpperCase() : '?',
-        style: TextStyle(fontSize: radius, color: Colors.blue),
-      ),
-    );
-  }
-
-  Widget _buildProfileDetail(String label, String value) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 16.0),
-    child: Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          '$label:',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-        ),
-        Text(value, style: TextStyle(fontSize: 16)),
-      ],
-    ),
-  );
 }
 
 class Post {
@@ -518,6 +387,7 @@ class Post {
   final String description;
   final String imageBase64;
   final String orderId;
+  final String district;
 
   Post({
     required this.userId,
@@ -525,5 +395,15 @@ class Post {
     required this.description,
     required this.imageBase64,
     required this.orderId,
+    required this.district,
   });
+
+  factory Post.empty() => Post(
+    userId: '',
+    postId: '',
+    description: '',
+    imageBase64: '',
+    orderId: '',
+    district: '',
+  );
 }
