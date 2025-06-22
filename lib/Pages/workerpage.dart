@@ -356,7 +356,7 @@ class _WorkerpageState extends State<Workerpage> {
                                                   post.postId,
                                                 ),
                                         icon: Icon(
-                                          Icons.work,
+                                          Icons.location_on,
                                           color: Colors.white,
                                         ),
                                         label: Text(
