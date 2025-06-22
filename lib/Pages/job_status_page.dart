@@ -87,10 +87,7 @@ class _JobStatusPageState extends State<JobStatusPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Job Application Status'),
-        backgroundColor: Colors.blueAccent,
-      ),
+
       body:
           isLoading
               ? const Center(child: CircularProgressIndicator())
