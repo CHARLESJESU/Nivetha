@@ -1,5 +1,4 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 
@@ -79,12 +78,14 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
     fetchApplications();
   }
 
-  void fetchApplications() {
+  Future<void> fetchApplications() async {
+    setState(() => isLoading = true);
     final ref = FirebaseDatabase.instance
         .ref()
         .child('applications')
         .child(widget.jobProviderUserId);
 
+    _subscription?.cancel();
     _subscription = ref.onValue.listen(
       (event) {
         if (!mounted) return;
@@ -150,13 +151,11 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
           .child(orderId)
           .child('status');
 
-      // Perform atomic update to both paths
       await FirebaseDatabase.instance.ref().update({
         applicationsRef.path: newStatus,
         appliedJobsRef.path: newStatus,
       });
 
-      // If status is 'rejected', hide details
       if (newStatus == 'rejected') {
         setState(() {
           groupedApplications[orderId]!
@@ -219,11 +218,18 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
           });
         },
         children:
-            workers.asMap().entries.map((entry) {
-              int workerIndex = entry.key;
-              Application worker = entry.value;
-              return _buildWorkerCard(worker, orderIndex, workerIndex, orderId);
-            }).toList(),
+            workers
+                .asMap()
+                .entries
+                .map(
+                  (entry) => _buildWorkerCard(
+                    entry.value,
+                    orderIndex,
+                    entry.key,
+                    orderId,
+                  ),
+                )
+                .toList(),
       ),
     );
   }
@@ -409,37 +415,43 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Job Applications'),
-        backgroundColor: Colors.blueAccent,
-        foregroundColor: Colors.white,
-      ),
-      body:
+      body: Stack(
+        children: [
           isLoading
               ? const Center(child: CircularProgressIndicator())
-              : groupedApplications.isEmpty
-              ? Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.work_off, size: 50, color: Colors.grey),
-                    const SizedBox(height: 10),
-                    const Text('No applications yet'),
-                    TextButton(
-                      onPressed: fetchApplications,
-                      child: const Text('Refresh'),
-                    ),
-                  ],
-                ),
-              )
-              : ListView.builder(
-                itemCount: groupedApplications.length,
-                itemBuilder: (context, index) {
-                  String orderId = groupedApplications.keys.elementAt(index);
-                  final workers = groupedApplications[orderId] ?? [];
-                  return _buildOrderCard(orderId, workers, index);
-                },
+              : RefreshIndicator(
+                onRefresh: fetchApplications,
+                child:
+                    groupedApplications.isEmpty
+                        ? ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: const [
+                            SizedBox(height: 150),
+                            Center(
+                              child: Icon(
+                                Icons.work_off,
+                                size: 50,
+                                color: Colors.grey,
+                              ),
+                            ),
+                            SizedBox(height: 10),
+                            Center(child: Text('No applications yet')),
+                          ],
+                        )
+                        : ListView.builder(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          itemCount: groupedApplications.length,
+                          itemBuilder: (context, index) {
+                            String orderId = groupedApplications.keys.elementAt(
+                              index,
+                            );
+                            final workers = groupedApplications[orderId] ?? [];
+                            return _buildOrderCard(orderId, workers, index);
+                          },
+                        ),
               ),
+        ],
+      ),
     );
   }
 }
