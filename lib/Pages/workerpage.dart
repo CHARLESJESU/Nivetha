@@ -196,6 +196,7 @@ class _WorkerpageState extends State<Workerpage> {
         'orderId': post.orderId,
         'description': post.description,
         'imageBase64': post.imageBase64,
+        'district': post.district,
         'status': 'applied',
         'appliedAt': DateTime.now().toIso8601String(),
       };
