@@ -2,6 +2,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_database/firebase_database.dart';
@@ -11,6 +12,7 @@ import '../login/Login.dart';
 import '../screens/user_data.dart';
 import 'Backcontroll.dart';
 import 'job_status_page.dart';
+import 'map_pages.dart';
 
 class Workerpage extends StatefulWidget {
   final UserData userData;
@@ -29,6 +31,8 @@ class _WorkerpageState extends State<Workerpage> {
   List<Post> posts = [];
   bool isLoading = true;
   Map<String, bool> appliedJobs = {};
+  Map<String, JobProvider> jobProviderDetails = {};
+
 
   @override
   void initState() {
@@ -67,10 +71,15 @@ class _WorkerpageState extends State<Workerpage> {
     try {
       final postsRef = FirebaseDatabase.instance.ref().child('jobs/workers');
       final snapshot = await postsRef.get();
+
       List<Post> fetchedPosts = [];
+      Map<String, JobProvider> fetchedJobProviders = {};
+
       if (snapshot.exists) {
         final workersData = snapshot.value as Map<dynamic, dynamic>;
-        workersData.forEach((userId, postsData) {
+
+        for (final userId in workersData.keys) {
+          final postsData = workersData[userId];
           if (postsData is Map<dynamic, dynamic>) {
             postsData.forEach((key, value) {
               if (value is Map<dynamic, dynamic>) {
@@ -86,15 +95,45 @@ class _WorkerpageState extends State<Workerpage> {
               }
             });
           }
-        });
+
+          // Fetch job provider details for this userId
+          final providerSnapshot = await FirebaseDatabase.instance
+              .ref()
+              .child('users/jobproviders/$userId')
+              .get();
+
+          if (providerSnapshot.exists) {
+            final value = providerSnapshot.value as Map<dynamic, dynamic>;
+            fetchedJobProviders[userId] = JobProvider(
+              name: value['name'] ?? '',
+              gender: value['gender'] ?? '',
+              dob: value['dob'] ?? '',
+              email: value['email-id'] ?? '',
+              phone: value['phone'] ?? '',
+              address: value['address'] ?? '',
+              area: value['area'] ?? '',
+              city: value['city'] ?? '',
+              district: value['district'] ?? '',
+              state: value['state'] ?? '',
+              country: value['country'] ?? '',
+              experience: value['experience'] ?? '',
+              role: value['role'] ?? '',
+              profileImageBase64: value['profileImageBase64'] ?? '',
+            );
+          }
+        }
       }
+
+      // Sort posts by postId descending
       fetchedPosts.sort((a, b) => b.postId.compareTo(a.postId));
+
       setState(() {
         posts = fetchedPosts;
+        jobProviderDetails = fetchedJobProviders;
         isLoading = false;
       });
     } catch (e) {
-      print("Failed to load posts: $e");
+      print("Failed to load posts or providers: $e");
       setState(() => isLoading = false);
     }
   }
@@ -229,6 +268,9 @@ class _WorkerpageState extends State<Workerpage> {
           itemBuilder: (context, index) {
             final post = posts[index];
             final isApplied = appliedJobs[post.postId] ?? false;
+            final provider = jobProviderDetails[post.userId];
+            final providerName = provider?.name ?? "Unknown";
+            final providerAddress = provider?.address ?? "";
 
             return Card(
               color: Color(0xFFF2F2F2),
@@ -242,10 +284,67 @@ class _WorkerpageState extends State<Workerpage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          "Job Provider Id: ${post.userId}",
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blueAccent,
+                          ),
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.location_on, color: Colors.redAccent),
+                          onPressed: () async {
+            if (providerAddress != null && providerAddress!.isNotEmpty) {
+            try {
+            List<Location> locations = await locationFromAddress(
+            providerAddress!,
+            );
+
+            if (locations.isNotEmpty) {
+            final lat = locations[0].latitude;
+            final lng = locations[0].longitude;
+
+            Navigator.push(
+            context,
+            MaterialPageRoute(
+            builder:
+            (context) => MapPage(
+            latitude: lat,
+            longitude: lng,
+            address: providerAddress!,
+            ),
+            ),
+            );
+            }
+            } catch (e) {
+            print("Error getting location: $e");
+            ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+            content: Text(
+            "Couldn't find location for the given address",
+            ),
+            ),
+            );
+            }
+            } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Address is empty")),
+            );
+            }
+            },
+         // No functionality as requested
+                        ),
+
+                      ],
+                    ), SizedBox(height: 2),
                     Text(
-                      "Job Provider Id: ${post.userId}",
+                      "City: ${jobProviderDetails[post.userId]?.city} ",
                       style: TextStyle(
-                        fontSize: 18,
+                        fontSize: 12,
                         fontWeight: FontWeight.bold,
                         color: Colors.blueAccent,
                       ),
@@ -260,24 +359,21 @@ class _WorkerpageState extends State<Workerpage> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder:
-                                      (_) => Scaffold(
-                                        appBar: AppBar(
-                                          backgroundColor: Colors.black,
-                                          iconTheme: IconThemeData(
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                        backgroundColor: Colors.black,
-                                        body: Center(
-                                          child: InteractiveViewer(
-                                            child: Image.memory(
-                                              base64Decode(post.imageBase64),
-                                              fit: BoxFit.contain,
-                                            ),
-                                          ),
+                                  builder: (_) => Scaffold(
+                                    appBar: AppBar(
+                                      backgroundColor: Colors.black,
+                                      iconTheme: IconThemeData(color: Colors.white),
+                                    ),
+                                    backgroundColor: Colors.black,
+                                    body: Center(
+                                      child: InteractiveViewer(
+                                        child: Image.memory(
+                                          base64Decode(post.imageBase64),
+                                          fit: BoxFit.contain,
                                         ),
                                       ),
+                                    ),
+                                  ),
                                 ),
                               );
                             },
@@ -307,13 +403,12 @@ class _WorkerpageState extends State<Workerpage> {
                               Align(
                                 alignment: Alignment.centerRight,
                                 child: ElevatedButton.icon(
-                                  onPressed:
-                                      isApplied
-                                          ? null
-                                          : () => _applyForJob(
-                                            post.userId,
-                                            post.postId,
-                                          ),
+                                  onPressed: isApplied
+                                      ? null
+                                      : () => _applyForJob(
+                                    post.userId,
+                                    post.postId,
+                                  ),
                                   icon: Icon(Icons.work, color: Colors.white),
                                   label: Text(
                                     isApplied ? "Applied" : "Apply Now",
@@ -321,7 +416,7 @@ class _WorkerpageState extends State<Workerpage> {
                                   ),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor:
-                                        isApplied ? Colors.grey : Colors.blue,
+                                    isApplied ? Colors.grey : Colors.blue,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(10),
                                     ),
@@ -341,6 +436,7 @@ class _WorkerpageState extends State<Workerpage> {
                 ),
               ),
             );
+
           },
         );
   }
@@ -525,5 +621,40 @@ class Post {
     required this.description,
     required this.imageBase64,
     required this.orderId,
+  });
+}
+class JobProvider {
+
+  final String name;
+  final String gender;
+  final String dob;
+  final String email;
+  final String phone;
+  final String address;
+  final String area;
+  final String city;
+  final String district;
+  final String state;
+  final String country;
+  final String experience;
+  final String role;
+  final String profileImageBase64;
+
+  JobProvider({
+
+    required this.name,
+    required this.gender,
+    required this.dob,
+    required this.email,
+    required this.phone,
+    required this.address,
+    required this.area,
+    required this.city,
+    required this.district,
+    required this.state,
+    required this.country,
+    required this.experience,
+    required this.role,
+    required this.profileImageBase64,
   });
 }
