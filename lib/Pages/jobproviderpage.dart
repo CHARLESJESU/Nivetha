@@ -142,7 +142,11 @@ class _JobproviderpageState extends State<Jobproviderpage> {
       child: Scaffold(
         key: _scaffoldKey,
         appBar: AppBar(
-          title: Text(' ${userData.name}'),
+          title: Text('Welcome, ${userData.name}',style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            fontSize: 25,
+          ),),
           backgroundColor: Colors.blue,
           leading: IconButton(
             icon: _buildProfileAvatar(radius: 20),
