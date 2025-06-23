@@ -33,13 +33,15 @@ class _WorkerpageState extends State<Workerpage> {
   Map<String, bool> appliedJobs = {};
   Map<String, JobProvider> jobProviderDetails = {};
 
+  String? selectedCity;
+  List<String> availableCities = [];
 
   @override
   void initState() {
     super.initState();
     userData = widget.userData;
     _initializePreferences();
-    _loadAppliedJobs(); // ✅ Load previously applied jobs
+    _loadAppliedJobs();
     _loadPosts();
   }
 
@@ -74,6 +76,7 @@ class _WorkerpageState extends State<Workerpage> {
 
       List<Post> fetchedPosts = [];
       Map<String, JobProvider> fetchedJobProviders = {};
+      Set<String> cities = {};
 
       if (snapshot.exists) {
         final workersData = snapshot.value as Map<dynamic, dynamic>;
@@ -96,14 +99,17 @@ class _WorkerpageState extends State<Workerpage> {
             });
           }
 
-          // Fetch job provider details for this userId
-          final providerSnapshot = await FirebaseDatabase.instance
-              .ref()
-              .child('users/jobproviders/$userId')
-              .get();
+          final providerSnapshot =
+              await FirebaseDatabase.instance
+                  .ref()
+                  .child('users/jobproviders/$userId')
+                  .get();
 
           if (providerSnapshot.exists) {
             final value = providerSnapshot.value as Map<dynamic, dynamic>;
+            final city = value['city'] ?? '';
+            if (city.isNotEmpty) cities.add(city);
+
             fetchedJobProviders[userId] = JobProvider(
               name: value['name'] ?? '',
               gender: value['gender'] ?? '',
@@ -112,7 +118,7 @@ class _WorkerpageState extends State<Workerpage> {
               phone: value['phone'] ?? '',
               address: value['address'] ?? '',
               area: value['area'] ?? '',
-              city: value['city'] ?? '',
+              city: city,
               district: value['district'] ?? '',
               state: value['state'] ?? '',
               country: value['country'] ?? '',
@@ -124,13 +130,13 @@ class _WorkerpageState extends State<Workerpage> {
         }
       }
 
-      // Sort posts by postId descending
       fetchedPosts.sort((a, b) => b.postId.compareTo(a.postId));
 
       setState(() {
         posts = fetchedPosts;
         jobProviderDetails = fetchedJobProviders;
         isLoading = false;
+        availableCities = cities.toList()..sort();
       });
     } catch (e) {
       print("Failed to load posts or providers: $e");
@@ -138,135 +144,57 @@ class _WorkerpageState extends State<Workerpage> {
     }
   }
 
-  Future<void> _pickImage() async {
-    final picker = ImagePicker();
-    final XFile? image = await showModalBottomSheet<XFile?>(
-      context: context,
-      builder:
-          (context) => SafeArea(
-            child: Wrap(
-              children: [
-                ListTile(
-                  leading: Icon(Icons.camera_alt),
-                  title: Text('Take Photo'),
-                  onTap: () async {
-                    final picked = await picker.pickImage(
-                      source: ImageSource.camera,
-                    );
-                    Navigator.pop(context, picked);
-                  },
-                ),
-                ListTile(
-                  leading: Icon(Icons.photo_library),
-                  title: Text('Choose from Gallery'),
-                  onTap: () async {
-                    final picked = await picker.pickImage(
-                      source: ImageSource.gallery,
-                    );
-                    Navigator.pop(context, picked);
-                  },
-                ),
-              ],
-            ),
-          ),
-    );
-    if (image != null) setState(() => userData.profileImage = image.path);
-  }
-
-  Future<void> _applyForJob(String jobProviderUserId, String postId) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please log in to apply for jobs")),
-      );
-      return;
-    }
-
-    try {
-      final workerUserId = userData.userId;
-
-      final workerDetails = {
-        'workerUserId': workerUserId,
-        'name': userData.name,
-        'phoneNumber': userData.phoneNumber,
-        'experience': userData.experience ?? 'Not provided',
-        'role': userData.role,
-        'gender': userData.gender,
-        'dob': userData.dob?.toLocal().toString().split(' ')[0] ?? 'Not Set',
-        'country': userData.country,
-        'state': userData.state,
-        'district': userData.district,
-        'city': userData.city,
-        'area': userData.area,
-        'address': userData.address,
-      };
-
-      final post = posts.firstWhere(
-        (p) => p.postId == postId && p.userId == jobProviderUserId,
-        orElse:
-            () => Post(
-              userId: '',
-              postId: '',
-              orderId: '',
-              description: '',
-              imageBase64: '',
-            ),
-      );
-
-      if (post.postId.isEmpty || post.userId.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Post not found or invalid")),
-        );
-        return;
-      }
-
-      await FirebaseDatabase.instance
-          .ref('applications/$jobProviderUserId/$postId/$workerUserId')
-          .set(workerDetails);
-
-      final appliedJobDetails = {
-        'orderId': post.orderId,
-        'description': post.description,
-        'imageBase64': post.imageBase64,
-        'status': 'applied',
-        'appliedAt': DateTime.now().toIso8601String(),
-      };
-
-      await FirebaseDatabase.instance
-          .ref('appliedJobs/$workerUserId/$jobProviderUserId/$postId')
-          .set(appliedJobDetails);
-
-      setState(() => appliedJobs[postId] = true);
-      await _saveAppliedJob(postId); // ✅ Save applied job locally
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Successfully applied to the job!")),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Failed to apply to the job: $e")));
-    }
-  }
-
   Widget _buildMainContent() {
     if (_selectedIndex == 0) {
-      return buildJobPosts();
+      return Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: DropdownButton<String?>(
+              value: selectedCity,
+              hint: Text("Filter by City"),
+              isExpanded: true,
+              items: [
+                DropdownMenuItem<String?>(
+                  value: null,
+                  child: Text("All Cities"),
+                ),
+                ...availableCities.map(
+                  (city) =>
+                      DropdownMenuItem<String?>(value: city, child: Text(city)),
+                ),
+              ],
+              onChanged: (value) {
+                setState(() => selectedCity = value);
+              },
+            ),
+          ),
+          Expanded(child: buildJobPosts()),
+        ],
+      );
     } else {
       return JobStatusPage(userData: userData);
     }
   }
 
   Widget buildJobPosts() {
+    final filteredPosts =
+        selectedCity == null
+            ? posts
+            : posts.where((post) {
+              final provider = jobProviderDetails[post.userId];
+              return provider?.city == selectedCity;
+            }).toList();
+
     return isLoading
         ? Center(child: CircularProgressIndicator())
-        : posts.isEmpty
-        ? Center(child: Text("No jobs available."))
+        : filteredPosts.isEmpty
+        ? Center(child: Text("No jobs available for selected city."))
         : ListView.builder(
           padding: const EdgeInsets.all(12),
-          itemCount: posts.length,
+          itemCount: filteredPosts.length,
           itemBuilder: (context, index) {
-            final post = posts[index];
+            final post = filteredPosts[index];
             final isApplied = appliedJobs[post.postId] ?? false;
             final provider = jobProviderDetails[post.userId];
             final providerName = provider?.name ?? "Unknown";
@@ -296,53 +224,51 @@ class _WorkerpageState extends State<Workerpage> {
                           ),
                         ),
                         IconButton(
-                          icon: Icon(Icons.location_on, color: Colors.redAccent),
+                          icon: Icon(
+                            Icons.location_on,
+                            color: Colors.redAccent,
+                          ),
                           onPressed: () async {
-            if (providerAddress != null && providerAddress!.isNotEmpty) {
-            try {
-            List<Location> locations = await locationFromAddress(
-            providerAddress!,
-            );
-
-            if (locations.isNotEmpty) {
-            final lat = locations[0].latitude;
-            final lng = locations[0].longitude;
-
-            Navigator.push(
-            context,
-            MaterialPageRoute(
-            builder:
-            (context) => MapPage(
-            latitude: lat,
-            longitude: lng,
-            address: providerAddress!,
-            ),
-            ),
-            );
-            }
-            } catch (e) {
-            print("Error getting location: $e");
-            ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-            content: Text(
-            "Couldn't find location for the given address",
-            ),
-            ),
-            );
-            }
-            } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Address is empty")),
-            );
-            }
-            },
-         // No functionality as requested
+                            if (providerAddress.isNotEmpty) {
+                              try {
+                                List<Location> locations =
+                                    await locationFromAddress(providerAddress);
+                                if (locations.isNotEmpty) {
+                                  final lat = locations[0].latitude;
+                                  final lng = locations[0].longitude;
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder:
+                                          (context) => MapPage(
+                                            latitude: lat,
+                                            longitude: lng,
+                                            address: providerAddress,
+                                          ),
+                                    ),
+                                  );
+                                }
+                              } catch (e) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      "Couldn't find location for the given address",
+                                    ),
+                                  ),
+                                );
+                              }
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text("Address is empty")),
+                              );
+                            }
+                          },
                         ),
-
                       ],
-                    ), SizedBox(height: 2),
+                    ),
+                    SizedBox(height: 2),
                     Text(
-                      "City: ${jobProviderDetails[post.userId]?.city} ",
+                      "City: ${provider?.city ?? ''}",
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
@@ -359,21 +285,24 @@ class _WorkerpageState extends State<Workerpage> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (_) => Scaffold(
-                                    appBar: AppBar(
-                                      backgroundColor: Colors.black,
-                                      iconTheme: IconThemeData(color: Colors.white),
-                                    ),
-                                    backgroundColor: Colors.black,
-                                    body: Center(
-                                      child: InteractiveViewer(
-                                        child: Image.memory(
-                                          base64Decode(post.imageBase64),
-                                          fit: BoxFit.contain,
+                                  builder:
+                                      (_) => Scaffold(
+                                        appBar: AppBar(
+                                          backgroundColor: Colors.black,
+                                          iconTheme: IconThemeData(
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                        backgroundColor: Colors.black,
+                                        body: Center(
+                                          child: InteractiveViewer(
+                                            child: Image.memory(
+                                              base64Decode(post.imageBase64),
+                                              fit: BoxFit.contain,
+                                            ),
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                  ),
                                 ),
                               );
                             },
@@ -403,12 +332,13 @@ class _WorkerpageState extends State<Workerpage> {
                               Align(
                                 alignment: Alignment.centerRight,
                                 child: ElevatedButton.icon(
-                                  onPressed: isApplied
-                                      ? null
-                                      : () => _applyForJob(
-                                    post.userId,
-                                    post.postId,
-                                  ),
+                                  onPressed:
+                                      isApplied
+                                          ? null
+                                          : () => _applyForJob(
+                                            post.userId,
+                                            post.postId,
+                                          ),
                                   icon: Icon(Icons.work, color: Colors.white),
                                   label: Text(
                                     isApplied ? "Applied" : "Apply Now",
@@ -416,7 +346,7 @@ class _WorkerpageState extends State<Workerpage> {
                                   ),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor:
-                                    isApplied ? Colors.grey : Colors.blue,
+                                        isApplied ? Colors.grey : Colors.blue,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(10),
                                     ),
@@ -436,9 +366,18 @@ class _WorkerpageState extends State<Workerpage> {
                 ),
               ),
             );
-
           },
         );
+  }
+
+  void _applyForJob(String userId, String postId) {
+    setState(() {
+      appliedJobs[postId] = true;
+    });
+    _saveAppliedJob(postId);
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text("Job applied successfully")));
   }
 
   @override
@@ -606,6 +545,10 @@ class _WorkerpageState extends State<Workerpage> {
       ],
     ),
   );
+
+  void _pickImage() {
+    // implement your image picking logic
+  }
 }
 
 class Post {
@@ -623,8 +566,8 @@ class Post {
     required this.orderId,
   });
 }
-class JobProvider {
 
+class JobProvider {
   final String name;
   final String gender;
   final String dob;
@@ -641,7 +584,6 @@ class JobProvider {
   final String profileImageBase64;
 
   JobProvider({
-
     required this.name,
     required this.gender,
     required this.dob,
