@@ -26,6 +26,7 @@ class _JobproviderpageState extends State<Jobproviderpage> {
   int _selectedIndex = 0;
   int _backPressCounter = 0;
   DateTime? _lastBackPressed;
+  bool _showFullProfile = false; // ✅ NEW STATE VARIABLE
 
   @override
   void initState() {
@@ -38,7 +39,7 @@ class _JobproviderpageState extends State<Jobproviderpage> {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setBool('isLoggedIn', true);
     await prefs.setBool('isworker', false);
-    await prefs.setString('userData', jsonEncode(widget.userData!.toJson()));
+    await prefs.setString('userData', jsonEncode(widget.userData.toJson()));
   }
 
   Future<void> _pickImage() async {
@@ -209,7 +210,7 @@ class _JobproviderpageState extends State<Jobproviderpage> {
               userData.name,
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
-            accountEmail: Text(userData.phoneNumber),
+            accountEmail: Text(userData.userId),
             currentAccountPicture: Stack(
               children: [
                 _buildProfileAvatar(radius: 40),
@@ -236,6 +237,46 @@ class _JobproviderpageState extends State<Jobproviderpage> {
             ),
             decoration: BoxDecoration(color: Colors.blueAccent),
           ),
+
+          Center(
+            child: ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  _showFullProfile = !_showFullProfile;
+                });
+              },
+              child: Text(_showFullProfile ? 'Hide Profile' : 'My Profile'),
+            ),
+          ),
+
+          if (_showFullProfile) ...[
+            Divider(),
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Text(
+                'Profile Details',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+            _buildProfileDetail('User Id', userData.userId),
+            _buildProfileDetail('Role', userData.role),
+            _buildProfileDetail('Gender', userData.gender),
+            _buildProfileDetail(
+              'DOB',
+              userData.dob?.toLocal().toString().split(' ')[0] ?? 'Not Set',
+            ),
+            _buildProfileDetail('Phone', userData.phoneNumber),
+            _buildProfileDetail('Country', userData.country),
+            _buildProfileDetail('State', userData.state),
+            _buildProfileDetail('District', userData.district),
+            _buildProfileDetail('City', userData.city),
+            _buildProfileDetail('Area', userData.area),
+            _buildProfileDetail('Address', userData.address),
+            if (userData.role == 'Worker')
+              _buildProfileDetail('Experience', userData.experience ?? ''),
+          ],
+
+          Divider(),
           ListTile(
             leading: Icon(Icons.logout),
             title: Text('Logout'),
@@ -263,30 +304,6 @@ class _JobproviderpageState extends State<Jobproviderpage> {
               }
             },
           ),
-          Divider(),
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Text(
-              'Profile Details',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ),
-          _buildProfileDetail('User Id', userData.userId),
-          _buildProfileDetail('Role', userData.role),
-          _buildProfileDetail('Gender', userData.gender),
-          _buildProfileDetail(
-            'DOB',
-            userData.dob?.toLocal().toString().split(' ')[0] ?? 'Not Set',
-          ),
-          _buildProfileDetail('Phone', userData.phoneNumber),
-          _buildProfileDetail('Country', userData.country),
-          _buildProfileDetail('State', userData.state),
-          _buildProfileDetail('District', userData.district),
-          _buildProfileDetail('City', userData.city),
-          _buildProfileDetail('Area', userData.area),
-          _buildProfileDetail('Address', userData.address),
-          if (userData.role == 'Worker')
-            _buildProfileDetail('Experience', userData.experience ?? ''),
         ],
       ),
     );
@@ -318,7 +335,14 @@ class _JobproviderpageState extends State<Jobproviderpage> {
           '$label:',
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
-        Text(value, style: TextStyle(fontSize: 16)),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(value, style: TextStyle(fontSize: 16)),
+            SizedBox(width: 8),
+            Icon(Icons.edit, size: 16, color: Colors.blueAccent),
+          ],
+        ),
       ],
     ),
   );
