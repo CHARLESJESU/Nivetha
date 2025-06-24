@@ -33,15 +33,12 @@ class _WorkerpageState extends State<Workerpage> {
   Map<String, bool> appliedJobs = {};
   Map<String, JobProvider> jobProviderDetails = {};
 
-  String? selectedCity;
-  List<String> availableCities = [];
-
   @override
   void initState() {
     super.initState();
     userData = widget.userData;
     _initializePreferences();
-    _loadAppliedJobs();
+    _loadAppliedJobs(); // ✅ Load previously applied jobs
     _loadPosts();
   }
 
@@ -76,7 +73,6 @@ class _WorkerpageState extends State<Workerpage> {
 
       List<Post> fetchedPosts = [];
       Map<String, JobProvider> fetchedJobProviders = {};
-      Set<String> cities = {};
 
       if (snapshot.exists) {
         final workersData = snapshot.value as Map<dynamic, dynamic>;
@@ -99,6 +95,7 @@ class _WorkerpageState extends State<Workerpage> {
             });
           }
 
+          // Fetch job provider details for this userId
           final providerSnapshot =
               await FirebaseDatabase.instance
                   .ref()
@@ -107,9 +104,6 @@ class _WorkerpageState extends State<Workerpage> {
 
           if (providerSnapshot.exists) {
             final value = providerSnapshot.value as Map<dynamic, dynamic>;
-            final city = value['city'] ?? '';
-            if (city.isNotEmpty) cities.add(city);
-
             fetchedJobProviders[userId] = JobProvider(
               name: value['name'] ?? '',
               gender: value['gender'] ?? '',
@@ -118,7 +112,7 @@ class _WorkerpageState extends State<Workerpage> {
               phone: value['phone'] ?? '',
               address: value['address'] ?? '',
               area: value['area'] ?? '',
-              city: city,
+              city: value['city'] ?? '',
               district: value['district'] ?? '',
               state: value['state'] ?? '',
               country: value['country'] ?? '',
@@ -130,13 +124,13 @@ class _WorkerpageState extends State<Workerpage> {
         }
       }
 
+      // Sort posts by postId descending
       fetchedPosts.sort((a, b) => b.postId.compareTo(a.postId));
 
       setState(() {
         posts = fetchedPosts;
         jobProviderDetails = fetchedJobProviders;
         isLoading = false;
-        availableCities = cities.toList()..sort();
       });
     } catch (e) {
       print("Failed to load posts or providers: $e");
@@ -144,57 +138,135 @@ class _WorkerpageState extends State<Workerpage> {
     }
   }
 
-  Widget _buildMainContent() {
-    if (_selectedIndex == 0) {
-      return Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: DropdownButton<String?>(
-              value: selectedCity,
-              hint: Text("Filter by City"),
-              isExpanded: true,
-              items: [
-                DropdownMenuItem<String?>(
-                  value: null,
-                  child: Text("All Cities"),
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final XFile? image = await showModalBottomSheet<XFile?>(
+      context: context,
+      builder:
+          (context) => SafeArea(
+            child: Wrap(
+              children: [
+                ListTile(
+                  leading: Icon(Icons.camera_alt),
+                  title: Text('Take Photo'),
+                  onTap: () async {
+                    final picked = await picker.pickImage(
+                      source: ImageSource.camera,
+                    );
+                    Navigator.pop(context, picked);
+                  },
                 ),
-                ...availableCities.map(
-                  (city) =>
-                      DropdownMenuItem<String?>(value: city, child: Text(city)),
+                ListTile(
+                  leading: Icon(Icons.photo_library),
+                  title: Text('Choose from Gallery'),
+                  onTap: () async {
+                    final picked = await picker.pickImage(
+                      source: ImageSource.gallery,
+                    );
+                    Navigator.pop(context, picked);
+                  },
                 ),
               ],
-              onChanged: (value) {
-                setState(() => selectedCity = value);
-              },
             ),
           ),
-          Expanded(child: buildJobPosts()),
-        ],
+    );
+    if (image != null) setState(() => userData.profileImage = image.path);
+  }
+
+  Future<void> _applyForJob(String jobProviderUserId, String postId) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please log in to apply for jobs")),
       );
+      return;
+    }
+
+    try {
+      final workerUserId = userData.userId;
+
+      final workerDetails = {
+        'workerUserId': workerUserId,
+        'name': userData.name,
+        'phoneNumber': userData.phoneNumber,
+        'experience': userData.experience ?? 'Not provided',
+        'role': userData.role,
+        'gender': userData.gender,
+        'dob': userData.dob?.toLocal().toString().split(' ')[0] ?? 'Not Set',
+        'country': userData.country,
+        'state': userData.state,
+        'district': userData.district,
+        'city': userData.city,
+        'area': userData.area,
+        'address': userData.address,
+      };
+
+      final post = posts.firstWhere(
+        (p) => p.postId == postId && p.userId == jobProviderUserId,
+        orElse:
+            () => Post(
+              userId: '',
+              postId: '',
+              orderId: '',
+              description: '',
+              imageBase64: '',
+            ),
+      );
+
+      if (post.postId.isEmpty || post.userId.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Post not found or invalid")),
+        );
+        return;
+      }
+
+      await FirebaseDatabase.instance
+          .ref('applications/$jobProviderUserId/$postId/$workerUserId')
+          .set(workerDetails);
+
+      final appliedJobDetails = {
+        'orderId': post.orderId,
+        'description': post.description,
+        'imageBase64': post.imageBase64,
+        'status': 'applied',
+        'appliedAt': DateTime.now().toIso8601String(),
+      };
+
+      await FirebaseDatabase.instance
+          .ref('appliedJobs/$workerUserId/$jobProviderUserId/$postId')
+          .set(appliedJobDetails);
+
+      setState(() => appliedJobs[postId] = true);
+      await _saveAppliedJob(postId); // ✅ Save applied job locally
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Successfully applied to the job!")),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Failed to apply to the job: $e")));
+    }
+  }
+
+  Widget _buildMainContent() {
+    if (_selectedIndex == 0) {
+      return buildJobPosts();
     } else {
       return JobStatusPage(userData: userData);
     }
   }
 
   Widget buildJobPosts() {
-    final filteredPosts =
-        selectedCity == null
-            ? posts
-            : posts.where((post) {
-              final provider = jobProviderDetails[post.userId];
-              return provider?.city == selectedCity;
-            }).toList();
-
     return isLoading
         ? Center(child: CircularProgressIndicator())
-        : filteredPosts.isEmpty
-        ? Center(child: Text("No jobs available for selected city."))
+        : posts.isEmpty
+        ? Center(child: Text("No jobs available."))
         : ListView.builder(
           padding: const EdgeInsets.all(12),
-          itemCount: filteredPosts.length,
+          itemCount: posts.length,
           itemBuilder: (context, index) {
-            final post = filteredPosts[index];
+            final post = posts[index];
             final isApplied = appliedJobs[post.postId] ?? false;
             final provider = jobProviderDetails[post.userId];
             final providerName = provider?.name ?? "Unknown";
@@ -229,13 +301,16 @@ class _WorkerpageState extends State<Workerpage> {
                             color: Colors.redAccent,
                           ),
                           onPressed: () async {
-                            if (providerAddress.isNotEmpty) {
+                            if (providerAddress != null &&
+                                providerAddress!.isNotEmpty) {
                               try {
                                 List<Location> locations =
-                                    await locationFromAddress(providerAddress);
+                                    await locationFromAddress(providerAddress!);
+
                                 if (locations.isNotEmpty) {
                                   final lat = locations[0].latitude;
                                   final lng = locations[0].longitude;
+
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
@@ -243,12 +318,13 @@ class _WorkerpageState extends State<Workerpage> {
                                           (context) => MapPage(
                                             latitude: lat,
                                             longitude: lng,
-                                            address: providerAddress,
+                                            address: providerAddress!,
                                           ),
                                     ),
                                   );
                                 }
                               } catch (e) {
+                                print("Error getting location: $e");
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: Text(
@@ -263,12 +339,13 @@ class _WorkerpageState extends State<Workerpage> {
                               );
                             }
                           },
+                          // No functionality as requested
                         ),
                       ],
                     ),
                     SizedBox(height: 2),
                     Text(
-                      "City: ${provider?.city ?? ''}",
+                      "City: ${jobProviderDetails[post.userId]?.city} ",
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
@@ -368,16 +445,6 @@ class _WorkerpageState extends State<Workerpage> {
             );
           },
         );
-  }
-
-  void _applyForJob(String userId, String postId) {
-    setState(() {
-      appliedJobs[postId] = true;
-    });
-    _saveAppliedJob(postId);
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text("Job applied successfully")));
   }
 
   @override
@@ -545,10 +612,6 @@ class _WorkerpageState extends State<Workerpage> {
       ],
     ),
   );
-
-  void _pickImage() {
-    // implement your image picking logic
-  }
 }
 
 class Post {
