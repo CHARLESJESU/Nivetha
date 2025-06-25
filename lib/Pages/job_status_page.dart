@@ -15,6 +15,7 @@ class JobStatusPage extends StatefulWidget {
 class _JobStatusPageState extends State<JobStatusPage> {
   List<Map<String, dynamic>> jobList = [];
   bool isLoading = true;
+  String selectedStatus = 'All'; // NEW: filter selection
 
   @override
   void initState() {
@@ -94,18 +95,50 @@ class _JobStatusPageState extends State<JobStatusPage> {
         return true;
       },
       child: Scaffold(
+        appBar: AppBar(
+          actions: [
+            DropdownButton<String>(
+              value: selectedStatus,
+              onChanged: (value) {
+                if (value != null) {
+                  setState(() {
+                    selectedStatus = value;
+                  });
+                }
+              },
+              items:
+                  ['All', 'Accepted', 'Rejected', 'Applied']
+                      .map(
+                        (status) => DropdownMenuItem(
+                          value: status,
+                          child: Text(status),
+                        ),
+                      )
+                      .toList(),
+            ),
+          ],
+        ),
         body:
             isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : jobList.isEmpty
                 ? const Center(child: Text('No job applications found.'))
                 : ListView.builder(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(30),
                   itemCount: jobList.length,
                   itemBuilder: (context, index) {
                     final job = jobList[index];
+
+                    // Filter logic
+                    if (selectedStatus != 'All' &&
+                        job['status'].toString().toLowerCase() !=
+                            selectedStatus.toLowerCase()) {
+                      return const SizedBox.shrink();
+                    }
+
                     final statusColor = getStatusColor(job['status']);
                     final statusIcon = getStatusIcon(job['status']);
+
                     return Card(
                       margin: const EdgeInsets.only(bottom: 16),
                       shape: RoundedRectangleBorder(

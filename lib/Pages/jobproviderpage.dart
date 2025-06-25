@@ -11,6 +11,7 @@ import 'form_page.dart';
 import 'applications.dart';
 import 'messages.dart';
 import 'order_details.dart';
+import 'profile_details_page.dart';
 
 class Jobproviderpage extends StatefulWidget {
   final UserData userData;
@@ -37,7 +38,7 @@ class _JobproviderpageState extends State<Jobproviderpage> {
   void _initializePreferences() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setBool('isLoggedIn', true);
-    await prefs.setBool('isworker', false);
+    await prefs.setBool('worker', false);
     await prefs.setString('userData', jsonEncode(widget.userData!.toJson()));
   }
 
@@ -142,11 +143,14 @@ class _JobproviderpageState extends State<Jobproviderpage> {
       child: Scaffold(
         key: _scaffoldKey,
         appBar: AppBar(
-          title: Text('Welcome, ${userData.name}',style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-            fontSize: 25,
-          ),),
+          title: Text(
+            'Welcome, ${userData.name}',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+              fontSize: 25,
+            ),
+          ),
           backgroundColor: Colors.blue,
           leading: IconButton(
             icon: _buildProfileAvatar(radius: 20),
@@ -206,7 +210,7 @@ class _JobproviderpageState extends State<Jobproviderpage> {
               userData.name,
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
-            accountEmail: Text(userData.phoneNumber),
+            accountEmail: Text(userData.userId),
             currentAccountPicture: Stack(
               children: [
                 _buildProfileAvatar(radius: 40),
@@ -219,12 +223,6 @@ class _JobproviderpageState extends State<Jobproviderpage> {
                       decoration: BoxDecoration(
                         color: Colors.white,
                         shape: BoxShape.circle,
-                      ),
-                      padding: EdgeInsets.all(3),
-                      child: Icon(
-                        Icons.edit,
-                        size: 18,
-                        color: Colors.blueAccent,
                       ),
                     ),
                   ),
@@ -261,29 +259,18 @@ class _JobproviderpageState extends State<Jobproviderpage> {
             },
           ),
           Divider(),
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Text(
-              'Profile Details',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
+          ListTile(
+            leading: Icon(Icons.person),
+            title: Text('Profile Details'),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ProfileDetailsPage(userData: userData),
+                ),
+              );
+            },
           ),
-          _buildProfileDetail('User Id', userData.userId),
-          _buildProfileDetail('Role', userData.role),
-          _buildProfileDetail('Gender', userData.gender),
-          _buildProfileDetail(
-            'DOB',
-            userData.dob?.toLocal().toString().split(' ')[0] ?? 'Not Set',
-          ),
-          _buildProfileDetail('Phone', userData.phoneNumber),
-          _buildProfileDetail('Country', userData.country),
-          _buildProfileDetail('State', userData.state),
-          _buildProfileDetail('District', userData.district),
-          _buildProfileDetail('City', userData.city),
-          _buildProfileDetail('Area', userData.area),
-          _buildProfileDetail('Address', userData.address),
-          if (userData.role == 'Worker')
-            _buildProfileDetail('Experience', userData.experience ?? ''),
         ],
       ),
     );
