@@ -25,7 +25,7 @@ class _SplashScreenState extends State<SplashScreen> {
   Future<void> _checkLoginStatus() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     bool isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
-    bool isWorker = prefs.getBool('isworker') ?? false;
+    bool isWorker = prefs.getBool('worker') ?? false;
     String? userDataJson = prefs.getString('userData');
 
     // If user data exists, decode and create the UserData object
