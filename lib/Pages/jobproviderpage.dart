@@ -11,6 +11,7 @@ import 'form_page.dart';
 import 'applications.dart';
 import 'messages.dart';
 import 'order_details.dart';
+import 'profile_details_page.dart';
 
 class Jobproviderpage extends StatefulWidget {
   final UserData userData;
@@ -26,7 +27,6 @@ class _JobproviderpageState extends State<Jobproviderpage> {
   int _selectedIndex = 0;
   int _backPressCounter = 0;
   DateTime? _lastBackPressed;
-  bool _showFullProfile = false; // ✅ NEW STATE VARIABLE
 
   @override
   void initState() {
@@ -38,8 +38,8 @@ class _JobproviderpageState extends State<Jobproviderpage> {
   void _initializePreferences() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setBool('isLoggedIn', true);
-    await prefs.setBool('isworker', false);
-    await prefs.setString('userData', jsonEncode(widget.userData.toJson()));
+    await prefs.setBool('worker', false);
+    await prefs.setString('userData', jsonEncode(widget.userData!.toJson()));
   }
 
   Future<void> _pickImage() async {
@@ -224,12 +224,6 @@ class _JobproviderpageState extends State<Jobproviderpage> {
                         color: Colors.white,
                         shape: BoxShape.circle,
                       ),
-                      padding: EdgeInsets.all(3),
-                      child: Icon(
-                        Icons.edit,
-                        size: 18,
-                        color: Colors.blueAccent,
-                      ),
                     ),
                   ),
                 ),
@@ -237,46 +231,6 @@ class _JobproviderpageState extends State<Jobproviderpage> {
             ),
             decoration: BoxDecoration(color: Colors.blueAccent),
           ),
-
-          Center(
-            child: ElevatedButton(
-              onPressed: () {
-                setState(() {
-                  _showFullProfile = !_showFullProfile;
-                });
-              },
-              child: Text(_showFullProfile ? 'Hide Profile' : 'My Profile'),
-            ),
-          ),
-
-          if (_showFullProfile) ...[
-            Divider(),
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Text(
-                'Profile Details',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ),
-            _buildProfileDetail('User Id', userData.userId),
-            _buildProfileDetail('Role', userData.role),
-            _buildProfileDetail('Gender', userData.gender),
-            _buildProfileDetail(
-              'DOB',
-              userData.dob?.toLocal().toString().split(' ')[0] ?? 'Not Set',
-            ),
-            _buildProfileDetail('Phone', userData.phoneNumber),
-            _buildProfileDetail('Country', userData.country),
-            _buildProfileDetail('State', userData.state),
-            _buildProfileDetail('District', userData.district),
-            _buildProfileDetail('City', userData.city),
-            _buildProfileDetail('Area', userData.area),
-            _buildProfileDetail('Address', userData.address),
-            if (userData.role == 'Worker')
-              _buildProfileDetail('Experience', userData.experience ?? ''),
-          ],
-
-          Divider(),
           ListTile(
             leading: Icon(Icons.logout),
             title: Text('Logout'),
@@ -302,6 +256,19 @@ class _JobproviderpageState extends State<Jobproviderpage> {
                 await prefs.setBool('isLoggedIn', false);
                 Get.offAll(() => LoginScreen());
               }
+            },
+          ),
+          Divider(),
+          ListTile(
+            leading: Icon(Icons.person),
+            title: Text('Profile Details'),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ProfileDetailsPage(userData: userData),
+                ),
+              );
             },
           ),
         ],
@@ -335,14 +302,7 @@ class _JobproviderpageState extends State<Jobproviderpage> {
           '$label:',
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(value, style: TextStyle(fontSize: 16)),
-            SizedBox(width: 8),
-            Icon(Icons.edit, size: 16, color: Colors.blueAccent),
-          ],
-        ),
+        Text(value, style: TextStyle(fontSize: 16)),
       ],
     ),
   );
