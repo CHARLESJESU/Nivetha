@@ -1,4 +1,4 @@
-// import the new speech_to_text package
+// import statements remain unchanged
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -8,7 +8,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:speech_to_text/speech_to_text.dart' as stt; // 🔹 NEW
 import '../login/Login.dart';
 import '../screens/user_data.dart';
 import 'Backcontroll.dart';
@@ -26,24 +25,22 @@ class Workerpage extends StatefulWidget {
 class _WorkerpageState extends State<Workerpage> {
   late UserData userData;
   int _selectedIndex = 0;
+  int _backPressCounter = 0;
+  DateTime? _lastBackPressed;
 
   List<Post> posts = [];
   bool isLoading = true;
   Map<String, bool> appliedJobs = {};
   Map<String, JobProvider> jobProviderDetails = {};
-
-  // 🔹 NEW: Speech + City Filter
-  late stt.SpeechToText _speech;
-  bool _isListening = false;
-  String _selectedCity = 'All';
+  Set<String> availableCities = {};
+  String? selectedCity;
 
   @override
   void initState() {
     super.initState();
     userData = widget.userData;
-    _speech = stt.SpeechToText(); // 🔹 NEW
     _initializePreferences();
-    _loadAppliedJobs();
+    _loadAppliedJobs(); // ✅ Load previously applied jobs
     _loadPosts();
   }
 
@@ -78,9 +75,11 @@ class _WorkerpageState extends State<Workerpage> {
 
       List<Post> fetchedPosts = [];
       Map<String, JobProvider> fetchedJobProviders = {};
+      Set<String> cities = {};
 
       if (snapshot.exists) {
         final workersData = snapshot.value as Map<dynamic, dynamic>;
+
         for (final userId in workersData.keys) {
           final postsData = workersData[userId];
           if (postsData is Map<dynamic, dynamic>) {
@@ -98,34 +97,41 @@ class _WorkerpageState extends State<Workerpage> {
               }
             });
           }
+
+          // Fetch job provider details for this userId
           final providerSnapshot =
-              await FirebaseDatabase.instance
-                  .ref()
-                  .child('users/jobproviders/$userId')
-                  .get();
+          await FirebaseDatabase.instance
+              .ref()
+              .child('users/jobproviders/$userId')
+              .get();
 
           if (providerSnapshot.exists) {
-            final v = providerSnapshot.value as Map<dynamic, dynamic>;
+            final value = providerSnapshot.value as Map<dynamic, dynamic>;
             fetchedJobProviders[userId] = JobProvider(
-              name: v['name'] ?? '',
-              gender: v['gender'] ?? '',
-              dob: v['dob'] ?? '',
-              email: v['email-id'] ?? '',
-              phone: v['phone'] ?? '',
-              address: v['address'] ?? '',
-              area: v['area'] ?? '',
-              city: v['city'] ?? '',
-              district: v['district'] ?? '',
-              state: v['state'] ?? '',
-              country: v['country'] ?? '',
-              experience: v['experience'] ?? '',
-              role: v['role'] ?? '',
-              profileImageBase64: v['profileImageBase64'] ?? '',
+              name: value['name'] ?? '',
+              gender: value['gender'] ?? '',
+              dob: value['dob'] ?? '',
+              email: value['email-id'] ?? '',
+              phone: value['phone'] ?? '',
+              address: value['address'] ?? '',
+              area: value['area'] ?? '',
+              city: value['city'] ?? '',
+              district: value['district'] ?? '',
+              state: value['state'] ?? '',
+              country: value['country'] ?? '',
+              experience: value['experience'] ?? '',
+              role: value['role'] ?? '',
+              profileImageBase64: value['profileImageBase64'] ?? '',
             );
+            fetchedJobProviders[userId] = JobProvider as JobProvider;
+            if (JobProvider.city.isNotEmpty) {
+              cities.add(JobProvider.city);
+            }
           }
         }
       }
 
+      // Sort posts by postId descending
       fetchedPosts.sort((a, b) => b.postId.compareTo(a.postId));
 
       setState(() {
@@ -145,31 +151,31 @@ class _WorkerpageState extends State<Workerpage> {
       context: context,
       builder:
           (context) => SafeArea(
-            child: Wrap(
-              children: [
-                ListTile(
-                  leading: Icon(Icons.camera_alt),
-                  title: Text('Take Photo'),
-                  onTap: () async {
-                    final picked = await picker.pickImage(
-                      source: ImageSource.camera,
-                    );
-                    Navigator.pop(context, picked);
-                  },
-                ),
-                ListTile(
-                  leading: Icon(Icons.photo_library),
-                  title: Text('Choose from Gallery'),
-                  onTap: () async {
-                    final picked = await picker.pickImage(
-                      source: ImageSource.gallery,
-                    );
-                    Navigator.pop(context, picked);
-                  },
-                ),
-              ],
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: Icon(Icons.camera_alt),
+              title: Text('Take Photo'),
+              onTap: () async {
+                final picked = await picker.pickImage(
+                  source: ImageSource.camera,
+                );
+                Navigator.pop(context, picked);
+              },
             ),
-          ),
+            ListTile(
+              leading: Icon(Icons.photo_library),
+              title: Text('Choose from Gallery'),
+              onTap: () async {
+                final picked = await picker.pickImage(
+                  source: ImageSource.gallery,
+                );
+                Navigator.pop(context, picked);
+              },
+            ),
+          ],
+        ),
+      ),
     );
     if (image != null) setState(() => userData.profileImage = image.path);
   }
@@ -182,8 +188,10 @@ class _WorkerpageState extends State<Workerpage> {
       );
       return;
     }
+
     try {
       final workerUserId = userData.userId;
+
       final workerDetails = {
         'workerUserId': workerUserId,
         'name': userData.name,
@@ -201,18 +209,18 @@ class _WorkerpageState extends State<Workerpage> {
       };
 
       final post = posts.firstWhere(
-        (p) => p.postId == postId && p.userId == jobProviderUserId,
+            (p) => p.postId == postId && p.userId == jobProviderUserId,
         orElse:
             () => Post(
-              userId: '',
-              postId: '',
-              orderId: '',
-              description: '',
-              imageBase64: '',
-            ),
+          userId: '',
+          postId: '',
+          orderId: '',
+          description: '',
+          imageBase64: '',
+        ),
       );
 
-      if (post.postId.isEmpty) {
+      if (post.postId.isEmpty || post.userId.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Post not found or invalid")),
         );
@@ -236,7 +244,7 @@ class _WorkerpageState extends State<Workerpage> {
           .set(appliedJobDetails);
 
       setState(() => appliedJobs[postId] = true);
-      await _saveAppliedJob(postId);
+      await _saveAppliedJob(postId); // ✅ Save applied job locally
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Successfully applied to the job!")),
@@ -248,301 +256,215 @@ class _WorkerpageState extends State<Workerpage> {
     }
   }
 
-  // 🔹 NEW: Voice listening method
-  void _listenCityVoice() async {
-    if (!_isListening) {
-      bool available = await _speech.initialize();
-      if (available) {
-        setState(() => _isListening = true);
-        _speech.listen(
-          onResult: (res) {
-            setState(() {
-              _selectedCity = res.recognizedWords;
-            });
-          },
-        );
-      }
-    } else {
-      setState(() => _isListening = false);
-      _speech.stop();
-    }
-  }
-
   Widget _buildMainContent() {
-    return _selectedIndex == 0
-        ? buildJobPosts()
-        : JobStatusPage(userData: userData);
+    if (_selectedIndex == 0) {
+      return buildJobPosts();
+    } else {
+      return JobStatusPage(userData: userData);
+    }
   }
 
   Widget buildJobPosts() {
-    if (isLoading) {
-      return Center(child: CircularProgressIndicator());
-    }
-
     final filteredPosts =
-        _selectedCity == 'All'
-            ? posts
-            : posts
-                .where(
-                  (p) => jobProviderDetails[p.userId]?.city == _selectedCity,
-                )
-                .toList();
+    selectedCity == null
+        ? posts
+        : posts
+        .where(
+          (post) =>
+      jobProviderDetails[post.userId]?.city == selectedCity,
+    )
+        .toList();
+    return isLoading
+        ? Center(child: CircularProgressIndicator())
+        : Column(
+             children: [
 
-    return Column(
-      children: [
-        // 🔹 NEW: Filter UI
-        Padding(
-          padding: const EdgeInsets.all(12.0),
-          child: Row(
-            children: [
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  value: _selectedCity,
-                  items:
-                      [
-                            'All',
-                            ...posts
-                                .map(
-                                  (p) =>
-                                      jobProviderDetails[p.userId]?.city ?? '',
-                                )
-                                .where((c) => c.isNotEmpty)
-                                .toSet(),
-                          ]
-                          .map(
-                            (city) => DropdownMenuItem(
-                              value: city,
-                              child: Text(city),
-                            ),
-                          )
-                          .toList(),
-                  onChanged: (val) {
-                    setState(() => _selectedCity = val!);
-                  },
-                  decoration: InputDecoration(
-                    labelText: 'Filter by City',
-                    border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 12),
-                  ),
-                ),
-              ),
-              SizedBox(width: 8),
-              IconButton(
-                icon: Icon(
-                  _isListening ? Icons.mic : Icons.mic_none,
-                  color: Colors.blue,
-                ),
-                onPressed: _listenCityVoice,
-              ),
-            ],
+             ],
+    )
+        : posts.isEmpty
+        ? Center(child: Text("No jobs available."))
+        : ListView.builder(
+      padding: const EdgeInsets.all(12),
+      itemCount: posts.length,
+      itemBuilder: (context, index) {
+        final post = posts[index];
+        final isApplied = appliedJobs[post.postId] ?? false;
+        final provider = jobProviderDetails[post.userId];
+        final providerName = provider?.name ?? "Unknown";
+        final providerAddress = provider?.address ?? "";
+
+        return Card(
+          color: Color(0xFFF2F2F2),
+          margin: const EdgeInsets.only(bottom: 16),
+          elevation: 4,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
           ),
-        ),
-        Expanded(
-          child:
-              filteredPosts.isEmpty
-                  ? Center(child: Text("No jobs available."))
-                  : ListView.builder(
-                    padding: const EdgeInsets.all(12),
-                    itemCount: filteredPosts.length,
-                    itemBuilder: (context, idx) {
-                      final post = filteredPosts[idx];
-                      final isApplied = appliedJobs[post.postId] ?? false;
-                      final provider = jobProviderDetails[post.userId]!;
-                      final providerAddress = provider.address;
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      "Job Provider Id: ${post.userId}",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blueAccent,
+                      ),
+                    ),
+                    IconButton(
+                      icon: Icon(
+                        Icons.location_on,
+                        color: Colors.redAccent,
+                      ),
+                      onPressed: () async {
+                        if (providerAddress != null &&
+                            providerAddress!.isNotEmpty) {
+                          try {
+                            List<Location> locations =
+                            await locationFromAddress(providerAddress!);
 
-                      return Card(
-                        color: Color(0xFFF2F2F2),
-                        margin: const EdgeInsets.only(bottom: 16),
-                        elevation: 4,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    "Job Provider Id: ${post.userId}",
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.blueAccent,
-                                    ),
+                            if (locations.isNotEmpty) {
+                              final lat = locations[0].latitude;
+                              final lng = locations[0].longitude;
+
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder:
+                                      (context) => MapPage(
+                                    latitude: lat,
+                                    longitude: lng,
+                                    address: providerAddress!,
                                   ),
-                                  IconButton(
-                                    icon: Icon(
-                                      Icons.location_on,
-                                      color: Colors.redAccent,
-                                    ),
-                                    onPressed: () async {
-                                      if (providerAddress.isNotEmpty) {
-                                        try {
-                                          List<Location> locs =
-                                              await locationFromAddress(
-                                                providerAddress,
-                                              );
-                                          if (locs.isNotEmpty) {
-                                            Navigator.push(
-                                              context,
-                                              MaterialPageRoute(
-                                                builder:
-                                                    (_) => MapPage(
-                                                      latitude:
-                                                          locs[0].latitude,
-                                                      longitude:
-                                                          locs[0].longitude,
-                                                      address: providerAddress,
-                                                    ),
-                                              ),
-                                            );
-                                          }
-                                        } catch (e) {
-                                          print("Error finding location: $e");
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            SnackBar(
-                                              content: Text(
-                                                "Couldn't find location",
-                                              ),
-                                            ),
-                                          );
-                                        }
-                                      } else {
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          SnackBar(
-                                            content: Text("Address is empty"),
-                                          ),
-                                        );
-                                      }
-                                    },
-                                  ),
-                                ],
-                              ),
-                              Text(
-                                "City: ${provider.city}",
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.blueAccent,
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            print("Error getting location: $e");
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  "Couldn't find location for the given address",
                                 ),
                               ),
-                              SizedBox(height: 8),
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  if (post.imageBase64.isNotEmpty)
-                                    GestureDetector(
-                                      onTap: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder:
-                                                (_) => Scaffold(
-                                                  appBar: AppBar(
-                                                    backgroundColor:
-                                                        Colors.black,
-                                                    iconTheme: IconThemeData(
-                                                      color: Colors.white,
-                                                    ),
-                                                  ),
-                                                  backgroundColor: Colors.black,
-                                                  body: Center(
-                                                    child: InteractiveViewer(
-                                                      child: Image.memory(
-                                                        base64Decode(
-                                                          post.imageBase64,
-                                                        ),
-                                                        fit: BoxFit.contain,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                          ),
-                                        );
-                                      },
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(10),
-                                        child: Image.memory(
-                                          base64Decode(post.imageBase64),
-                                          height: 100,
-                                          width: 100,
-                                          fit: BoxFit.cover,
-                                        ),
-                                      ),
-                                    ),
-                                  SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          post.description,
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            color: Colors.black87,
-                                          ),
-                                        ),
-                                        SizedBox(height: 12),
-                                        Align(
-                                          alignment: Alignment.centerRight,
-                                          child: ElevatedButton.icon(
-                                            onPressed:
-                                                isApplied
-                                                    ? null
-                                                    : () => _applyForJob(
-                                                      post.userId,
-                                                      post.postId,
-                                                    ),
-                                            icon: Icon(
-                                              Icons.work,
-                                              color: Colors.white,
-                                            ),
-                                            label: Text(
-                                              isApplied
-                                                  ? "Applied"
-                                                  : "Apply Now",
-                                              style: TextStyle(
-                                                color: Colors.white,
-                                              ),
-                                            ),
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor:
-                                                  isApplied
-                                                      ? Colors.grey
-                                                      : Colors.blue,
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(10),
-                                              ),
-                                              padding: EdgeInsets.symmetric(
-                                                horizontal: 16,
-                                                vertical: 10,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ],
+                            );
+                          }
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text("Address is empty")),
+                          );
+                        }
+                      },
+                      // No functionality as requested
+                    ),
+                  ],
+                ),
+                SizedBox(height: 2),
+                Text(
+                  "City: ${jobProviderDetails[post.userId]?.city} ",
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blueAccent,
+                  ),
+                ),
+                SizedBox(height: 8),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (post.imageBase64.isNotEmpty)
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder:
+                                  (_) => Scaffold(
+                                appBar: AppBar(
+                                  backgroundColor: Colors.black,
+                                  iconTheme: IconThemeData(
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                backgroundColor: Colors.black,
+                                body: Center(
+                                  child: InteractiveViewer(
+                                    child: Image.memory(
+                                      base64Decode(post.imageBase64),
+                                      fit: BoxFit.contain,
                                     ),
                                   ),
-                                ],
+                                ),
                               ),
-                            ],
+                            ),
+                          );
+                        },
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Image.memory(
+                            base64Decode(post.imageBase64),
+                            height: 100,
+                            width: 100,
+                            fit: BoxFit.cover,
                           ),
                         ),
-                      );
-                    },
-                  ),
-        ),
-      ],
+                      ),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            post.description,
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          SizedBox(height: 12),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: ElevatedButton.icon(
+                              onPressed:
+                              isApplied
+                                  ? null
+                                  : () => _applyForJob(
+                                post.userId,
+                                post.postId,
+                              ),
+                              icon: Icon(Icons.work, color: Colors.white),
+                              label: Text(
+                                isApplied ? "Applied" : "Apply Now",
+                                style: TextStyle(color: Colors.white),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor:
+                                isApplied ? Colors.grey : Colors.blue,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 10,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -660,41 +582,22 @@ class _WorkerpageState extends State<Workerpage> {
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
-          ...[
-            ['User Id', userData.userId],
-            ['Role', userData.role],
-            ['Gender', userData.gender],
-            [
-              'DOB',
-              userData.dob?.toLocal().toString().split(' ')[0] ?? 'Not Set',
-            ],
-            ['Phone', userData.phoneNumber],
-            ['Country', userData.country],
-            ['State', userData.state],
-            ['District', userData.district],
-            ['City', userData.city],
-            ['Area', userData.area],
-            ['Address', userData.address],
-            if (userData.role == 'Worker')
-              ['Experience', userData.experience ?? ''],
-          ].map(
-            (e) => Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: 4.0,
-                horizontal: 16.0,
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    '${e[0]}:',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                  ),
-                  Text(e[1]!, style: TextStyle(fontSize: 16)),
-                ],
-              ),
-            ),
+          _buildProfileDetail('User Id', userData.userId),
+          _buildProfileDetail('Role', userData.role),
+          _buildProfileDetail('Gender', userData.gender),
+          _buildProfileDetail(
+            'DOB',
+            userData.dob?.toLocal().toString().split(' ')[0] ?? 'Not Set',
           ),
+          _buildProfileDetail('Phone', userData.phoneNumber),
+          _buildProfileDetail('Country', userData.country),
+          _buildProfileDetail('State', userData.state),
+          _buildProfileDetail('District', userData.district),
+          _buildProfileDetail('City', userData.city),
+          _buildProfileDetail('Area', userData.area),
+          _buildProfileDetail('Address', userData.address),
+          if (userData.role == 'Worker')
+            _buildProfileDetail('Experience', userData.experience ?? ''),
         ],
       ),
     );
@@ -716,6 +619,20 @@ class _WorkerpageState extends State<Workerpage> {
       ),
     );
   }
+
+  Widget _buildProfileDetail(String label, String value) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 16.0),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          '$label:',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        ),
+        Text(value, style: TextStyle(fontSize: 16)),
+      ],
+    ),
+  );
 }
 
 class Post {
@@ -735,20 +652,20 @@ class Post {
 }
 
 class JobProvider {
-  final String name,
-      gender,
-      dob,
-      email,
-      phone,
-      address,
-      area,
-      city,
-      district,
-      state,
-      country,
-      experience,
-      role,
-      profileImageBase64;
+  final String name;
+  final String gender;
+  final String dob;
+  final String email;
+  final String phone;
+  final String address;
+  final String area;
+  final String city;
+  final String district;
+  final String state;
+  final String country;
+  final String experience;
+  final String role;
+  final String profileImageBase64;
 
   JobProvider({
     required this.name,
