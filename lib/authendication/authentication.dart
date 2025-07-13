@@ -5,7 +5,7 @@ import 'package:firebase_database/firebase_database.dart';
 class AuthServicews {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final DatabaseReference _database = FirebaseDatabase.instance.ref();
+  // final DatabaseReference _database = FirebaseDatabase.instance.ref();
   // SignUp User
   Future<String> signupUser({
     required String email,
@@ -58,10 +58,18 @@ class AuthServicews {
           password: password,
         );
         final sanitizedEmail = email.replaceAll('.', '_dot_');
-        final snapshot = await _database.child("email").child(sanitizedEmail).get();
+        final snapshot = await FirebaseFirestore.instance
+            .collection('emails')
+            .doc(sanitizedEmail)
+            .get();
+        final snapshot1 = await FirebaseFirestore.instance
+            .collection('emails')
+            .get();
         if (snapshot.exists) {
           // final storedUserId = snapshot.value;
           userexist="existuser";
+          print(userexist);
+
         }
         res = "success";
       } else {
@@ -84,9 +92,13 @@ class AuthServicews {
       if (email.isNotEmpty && password.isNotEmpty) {
 
         final sanitizedEmail = email.replaceAll('.', '_dot_');
-        final snapshot = await _database.child("email").child(sanitizedEmail).get();
+        final snapshot = await FirebaseFirestore.instance
+            .collection('emails')
+            .doc(sanitizedEmail)
+            .get();
+
         if (snapshot.exists) {
-          final storedUserId = snapshot.value;
+          final storedUserId = snapshot.data()?['userId'];;
           userexist="$storedUserId";
         }
 

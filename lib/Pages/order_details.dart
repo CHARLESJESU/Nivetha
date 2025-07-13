@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:photo_view/photo_view.dart';
@@ -42,27 +43,27 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     final userId = widget.userId;
 
     try {
-      final ordersRef = FirebaseDatabase.instance.ref().child(
-        'jobs/workers/$userId',
-      );
-      final snapshot = await ordersRef.get();
+      final DocumentReference userDocRef = FirebaseFirestore.instance
+          .collection('jobs')
+          .doc('workers')
+          .collection('workers')
+          .doc(userId);
+
+      final CollectionReference ordersRef = userDocRef.collection('order');
+      final QuerySnapshot snapshot = await ordersRef.get();
 
       List<Order> fetchedOrders = [];
-      if (snapshot.exists) {
-        final orderData = snapshot.value as Map<dynamic, dynamic>;
 
-        orderData.forEach((key, value) {
-          if (value is Map<dynamic, dynamic>) {
-            fetchedOrders.add(
-              Order(
-                id: key,
-                orderId: value['orderId']?.toString() ?? key,
-                description: value['description'] ?? '',
-                imageBase64: value['imageBase64'] ?? '',
-              ),
-            );
-          }
-        });
+      for (var doc in snapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        fetchedOrders.add(
+          Order(
+            id: doc.id,
+            orderId: data['orderId']?.toString() ?? doc.id,
+            description: data['description'] ?? '',
+            imageBase64: data['imageBase64'] ?? '',
+          ),
+        );
       }
 
       fetchedOrders.sort((a, b) => b.id.compareTo(a.id));
@@ -72,11 +73,12 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
         isLoading = false;
       });
     } catch (e) {
-      print("Failed to load orders: $e");
-      setState(() {
-        isLoading = false;
-      });
+      setState(() => isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Failed to load orders: $e")),
+      );
     }
+
   }
 
   Uint8List _decodeBase64(String base64String) {
@@ -100,13 +102,19 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
 
   Future<void> _deleteOrder(String postId) async {
     try {
-      await FirebaseDatabase.instance
-          .ref()
-          .child('jobs/workers/${widget.userId}/$postId')
-          .remove();
+      await FirebaseFirestore.instance
+          .collection('jobs')
+          .doc('workers')
+          .collection('workers')
+          .doc(widget.userId)
+      .collection('order')
+      .doc(postId)
+          .delete();
+
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text("Deleted successfully")));
+
       _loadOrders();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -114,6 +122,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
       );
     }
   }
+
 
   Future<void> _editOrder(String postId, String currentDescription) async {
     TextEditingController _editController = TextEditingController(
@@ -146,9 +155,11 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                 }
 
                 try {
-                  await FirebaseDatabase.instance
-                      .ref()
-                      .child('jobs/workers/${widget.userId}/$postId')
+                  await FirebaseFirestore.instance
+                      .collection('jobs')
+                      .doc('workers')
+                      .collection('workers')
+                      .doc("${widget.userId}-${postId}")
                       .update({'description': newDescription});
 
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -163,6 +174,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                     ),
                   );
                 }
+
               },
               child: const Text('Save'),
             ),

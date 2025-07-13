@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:get/get.dart';
@@ -67,64 +68,76 @@ class _WorkerpageState extends State<Workerpage> {
 
   Future<void> _loadPosts() async {
     try {
-      final postsRef = FirebaseDatabase.instance.ref().child('jobs/workers');
-      final snapshot = await postsRef.get();
+      final workersRef = FirebaseFirestore.instance
+          .collection('jobs')
+          .doc('workers')
+          .collection('workers');
 
+      final workersSnapshot = await workersRef.get();
       List<Post> fetchedPosts = [];
       Map<String, JobProvider> fetchedJobProviders = {};
       Set<String> cities = {};
+      for (final workerDoc in workersSnapshot.docs) {
+        try {
 
-      if (snapshot.exists) {
-        final workersData = snapshot.value as Map<dynamic, dynamic>;
+          final userId = workerDoc.id;
 
-        for (final userId in workersData.keys) {
-          final postsData = workersData[userId];
-          if (postsData is Map<dynamic, dynamic>) {
-            postsData.forEach((key, value) {
-              if (value is Map<dynamic, dynamic>) {
-                fetchedPosts.add(
-                  Post(
-                    userId: userId,
-                    postId: key,
-                    description: value['description'] ?? '',
-                    imageBase64: value['imageBase64'] ?? '',
-                    orderId: value['orderId'] ?? '',
-                  ),
-                );
-              }
-            });
+          final ordersSnapshot = await workerDoc.reference
+              .collection('order')
+              .get();
+          for (final orderDoc in ordersSnapshot.docs) {
+
+            final data = orderDoc.data();
+
+
+            fetchedPosts.add(
+              Post(
+                userId: userId,
+                postId: orderDoc.id,
+                description: data['description'] ?? '',
+                imageBase64: data['imageBase64'] ?? '',
+                orderId: data['orderkey'] ?? '',
+              ),
+            );
           }
 
-          final providerSnapshot =
-              await FirebaseDatabase.instance
-                  .ref()
-                  .child('users/jobproviders/$userId')
-                  .get();
+          // Fetch job provider details
+          final providerSnapshot = await FirebaseFirestore.instance
+              .collection('users')
+              .doc('jobproviders')
+              .collection('jobproviders')
+              .doc(userId)
+              .get();
 
           if (providerSnapshot.exists) {
-            final value = providerSnapshot.value as Map<dynamic, dynamic>;
-            final city = value['city'] ?? '';
+            final data = providerSnapshot.data()!;
+            final city = data['city'] ?? '';
             if (city.isNotEmpty) cities.add(city);
 
             fetchedJobProviders[userId] = JobProvider(
-              name: value['name'] ?? '',
-              gender: value['gender'] ?? '',
-              dob: value['dob'] ?? '',
-              email: value['email-id'] ?? '',
-              phone: value['phone'] ?? '',
-              address: value['address'] ?? '',
-              area: value['area'] ?? '',
+              name: data['name'] ?? '',
+              gender: data['gender'] ?? '',
+              dob: data['dob'] ?? '',
+              email: data['email-id'] ?? '',
+              phone: data['phone'] ?? '',
+              address: data['address'] ?? '',
+              area: data['area'] ?? '',
               city: city,
-              district: value['district'] ?? '',
-              state: value['state'] ?? '',
-              country: value['country'] ?? '',
-              experience: value['experience'] ?? '',
-              role: value['role'] ?? '',
-              profileImageBase64: value['profileImageBase64'] ?? '',
+              district: data['district'] ?? '',
+              state: data['state'] ?? '',
+              country: data['country'] ?? '',
+              experience: data['experience'] ?? '',
+              role: data['role'] ?? '',
+              profileImageBase64: data['profileImageBase64'] ?? '',
             );
           }
+        } catch (e) {
+          print("Error processing workerDoc ${workerDoc.id}: $e");
+          continue; // Skip to next workerDoc
         }
+
       }
+
 
       fetchedPosts.sort((a, b) => b.postId.compareTo(a.postId));
 
@@ -139,6 +152,7 @@ class _WorkerpageState extends State<Workerpage> {
       setState(() => isLoading = false);
     }
   }
+
 
   Future<void> _pickImage() async {
     final picker = ImagePicker();
@@ -180,9 +194,11 @@ class _WorkerpageState extends State<Workerpage> {
       SharedPreferences prefs = await SharedPreferences.getInstance();
       await prefs.setString('userData', jsonEncode(userData.toJson()));
       try {
-        await FirebaseDatabase.instance
-            .ref()
-            .child('users/workers/${userData.userId}')
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc('workers')
+            .collection('workers')
+            .doc(userData.userId)
             .update({'profileImage': image.path});
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Profile image updated successfully')),
@@ -192,6 +208,7 @@ class _WorkerpageState extends State<Workerpage> {
           SnackBar(content: Text('Failed to update profile image: $e')),
         );
       }
+
     }
   }
 
@@ -242,9 +259,22 @@ class _WorkerpageState extends State<Workerpage> {
         return;
       }
 
-      await FirebaseDatabase.instance
-          .ref('applications/$jobProviderUserId/$postId/$workerUserId')
+      final postRef = FirebaseFirestore.instance
+          .collection('applications')
+          .doc(jobProviderUserId)
+          .collection('posts')
+          .doc(postId);
+
+// ✅ Set a dummy or useful field to ensure `postId` exists
+      await postRef.set({'active': true}, SetOptions(merge: true));
+
+// ✅ Then save the worker under 'workers' collection
+      await postRef
+          .collection('workers')
+          .doc(workerUserId)
           .set(workerDetails);
+
+
 
       final appliedJobDetails = {
         'orderId': post.orderId,
@@ -254,9 +284,22 @@ class _WorkerpageState extends State<Workerpage> {
         'appliedAt': DateTime.now().toIso8601String(),
       };
 
-      await FirebaseDatabase.instance
-          .ref('appliedJobs/$workerUserId/$jobProviderUserId/$postId')
+      final jobRef = FirebaseFirestore.instance
+          .collection('appliedJobs')
+          .doc(workerUserId)
+          .collection('jobProviders')
+          .doc(jobProviderUserId);
+
+// ✅ Ensure the jobProvider document exists with at least one field
+      await jobRef.set({'summa': 1}, SetOptions(merge: true)); // Or use any meaningful field
+
+// ✅ Now save the post inside 'posts' subcollection
+      await jobRef
+          .collection('posts')
+          .doc(postId)
           .set(appliedJobDetails);
+
+
 
       setState(() => appliedJobs[postId] = true);
       await _saveAppliedJob(postId);
@@ -699,10 +742,13 @@ class _ProfilePageState extends State<ProfilePage> {
     await prefs.setString('userData', jsonEncode(userData.toJson()));
 
     try {
-      await FirebaseDatabase.instance
-          .ref()
-          .child('users/workers/${userData.userId}')
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc('workers')
+          .collection('workers')
+          .doc(userData.userId)
           .update(userData.toJson());
+
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Profile updated successfully')));
@@ -788,10 +834,13 @@ class _ProfilePageState extends State<ProfilePage> {
       SharedPreferences prefs = await SharedPreferences.getInstance();
       await prefs.setString('userData', jsonEncode(userData.toJson()));
       try {
-        await FirebaseDatabase.instance
-            .ref()
-            .child('users/workers/${userData.userId}')
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc('workers')
+            .collection('workers')
+            .doc(userData.userId)
             .update({'profileImage': image.path});
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Profile image updated successfully')),
         );

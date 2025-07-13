@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 
@@ -80,42 +81,40 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
 
   Future<void> fetchApplications() async {
     setState(() => isLoading = true);
-    final ref = FirebaseDatabase.instance
-        .ref()
-        .child('applications')
-        .child(widget.jobProviderUserId);
+
+    final ref = FirebaseFirestore.instance
+        .collection('applications')
+        .doc(widget.jobProviderUserId)
+        .collection('posts'); // adjust if structure differs
 
     _subscription?.cancel();
-    _subscription = ref.onValue.listen(
-      (event) {
+    _subscription = ref.snapshots().listen(
+          (querySnapshot) async {
         if (!mounted) return;
-        Map<String, List<Application>> tempGroupedApps = {};
 
-        if (event.snapshot.exists) {
-          final data = event.snapshot.value as Map<dynamic, dynamic>?;
-          if (data != null) {
-            data.forEach((orderId, orderData) {
-              if (orderData is Map<dynamic, dynamic>) {
-                List<Application> workers = [];
-                orderData.forEach((workerUserId, workerData) {
-                  if (workerData is Map<dynamic, dynamic>) {
-                    workers.add(
-                      Application.fromMap(workerUserId.toString(), workerData),
-                    );
-                  }
-                });
-                tempGroupedApps[orderId.toString()] = workers;
-              }
-            });
+        Map<String, List<Application>> tempGroupedApps = {};
+         print("pdaljkdslflks");
+         print(querySnapshot.docs[0]);
+        for (var postDoc in querySnapshot.docs) {
+          final orderId = postDoc.id;
+
+          // Each post has a subcollection of worker applications
+          final workersSnapshot = await postDoc.reference.collection('workers').get();
+          List<Application> workers = [];
+
+          for (var workerDoc in workersSnapshot.docs) {
+            final workerUserId = workerDoc.id;
+            final workerData = workerDoc.data();
+
+            workers.add(Application.fromMap(workerUserId, workerData));
           }
+
+          tempGroupedApps[orderId] = workers;
         }
 
         setState(() {
           groupedApplications = tempGroupedApps;
-          showOrderDetails = List.generate(
-            tempGroupedApps.length,
-            (_) => false,
-          );
+          showOrderDetails = List.generate(tempGroupedApps.length, (_) => false);
           isLoading = false;
         });
       },
@@ -126,36 +125,44 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
           SnackBar(content: Text('Failed to load applications: $error')),
         );
       },
-    );
+    ) as StreamSubscription<DatabaseEvent>? ;
   }
 
+
   Future<void> updateApplicationStatus(
-    String orderId,
-    String workerUserId,
-    String newStatus,
-  ) async {
+      String orderId,
+      String workerUserId,
+      String newStatus,
+      ) async {
     try {
-      final applicationsRef = FirebaseDatabase.instance
-          .ref()
-          .child('applications')
-          .child(widget.jobProviderUserId)
-          .child(orderId)
-          .child(workerUserId)
-          .child('status');
+      final firestore = FirebaseFirestore.instance;
 
-      final appliedJobsRef = FirebaseDatabase.instance
-          .ref()
-          .child('appliedJobs')
-          .child(workerUserId)
-          .child(widget.jobProviderUserId)
-          .child(orderId)
-          .child('status');
+      // References for both paths to update
+      final applicationsRef = firestore
+          .collection('applications')
+          .doc(widget.jobProviderUserId)
+          .collection('posts')
+          .doc(orderId)
+          .collection('workers')
+          .doc(workerUserId);
 
-      await FirebaseDatabase.instance.ref().update({
-        applicationsRef.path: newStatus,
-        appliedJobsRef.path: newStatus,
-      });
+      final appliedJobsRef = firestore
+          .collection('appliedJobs')
+          .doc(workerUserId)
+          .collection('jobProviders')
+          .doc(widget.jobProviderUserId)
+          .collection('posts')
+          .doc(orderId);
 
+      // Perform batched update to both locations
+      WriteBatch batch = firestore.batch();
+
+      batch.update(applicationsRef, {'status': newStatus});
+      batch.update(appliedJobsRef, {'status': newStatus});
+
+      await batch.commit();
+
+      // Optional UI update for rejected status
       if (newStatus == 'rejected') {
         setState(() {
           groupedApplications[orderId]!
@@ -175,6 +182,7 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
       ).showSnackBar(SnackBar(content: Text('Failed to update status: $e')));
     }
   }
+
 
   Color getStatusColor(String status) {
     switch (status.toLowerCase()) {

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import '../screens/user_data.dart';
@@ -20,48 +21,56 @@ class _JobStatusPageState extends State<JobStatusPage> {
   @override
   void initState() {
     super.initState();
+
     fetchAppliedJobs();
   }
 
   Future<void> fetchAppliedJobs() async {
     try {
-      final ref = FirebaseDatabase.instance.ref(
-        'appliedJobs/${widget.userData.userId}',
-      );
-      final snapshot = await ref.get();
 
-      if (snapshot.exists) {
-        List<Map<String, dynamic>> jobs = [];
-        final data = snapshot.value as Map<dynamic, dynamic>;
+      final userId = widget.userData.userId;
 
-        data.forEach((jobProviderId, posts) {
-          if (posts is Map<dynamic, dynamic>) {
-            posts.forEach((postId, jobData) {
-              jobs.add({
-                'jobProviderId': jobProviderId,
-                'postId': postId,
-                'description': jobData['description'] ?? '',
-                'imageBase64': jobData['imageBase64'] ?? '',
-                'status': jobData['status'] ?? 'applied',
-              });
-            });
-          }
-        });
+      final jobProviderSnapshot = await FirebaseFirestore.instance
+          .collection('appliedJobs')
+          .doc(userId)
+          .collection('jobProviders')
+          .get();
 
-        setState(() {
-          jobList = jobs;
-          isLoading = false;
-        });
-      } else {
-        setState(() {
-          isLoading = false;
-        });
+      List<Map<String, dynamic>> jobs = [];
+
+      for (var providerDoc in jobProviderSnapshot.docs) {
+        final jobProviderId = providerDoc.id;
+
+        final postSnapshot = await FirebaseFirestore.instance
+            .collection('appliedJobs')
+            .doc(userId)
+            .collection('jobProviders')
+            .doc(jobProviderId)
+            .collection('posts')
+            .get();
+        print(postSnapshot.docs[0].id);
+        for (var postDoc in postSnapshot.docs) {
+          final data = postDoc.data();
+          jobs.add({
+            'jobProviderId': jobProviderId,
+            'postId': postDoc.id,
+            'description': data['description'] ?? '',
+            'imageBase64': data['imageBase64'] ?? '',
+            'status': data['status'] ?? 'applied',
+          });
+        }
       }
+
+      setState(() {
+        jobList = jobs;
+        isLoading = false;
+      });
     } catch (e) {
       print("Error fetching applied jobs: $e");
       setState(() => isLoading = false);
     }
   }
+
 
   Color getStatusColor(String status) {
     switch (status.toLowerCase()) {
