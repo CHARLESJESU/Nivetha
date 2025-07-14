@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:nivetha123/screens/user_data.dart';
@@ -18,7 +19,7 @@ class Page5Summary extends StatefulWidget {
 
 class _Page5SummaryState extends State<Page5Summary> {
   bool termsAccepted = false;
-  final DatabaseReference _database = FirebaseDatabase.instance.ref();
+
   String generatedUserId = '';
   bool isUserIdLoading = true;
   bool _isLoading = false;
@@ -41,15 +42,18 @@ class _Page5SummaryState extends State<Page5Summary> {
 
   Future<String> _generateUniqueUserId(String role) async {
     String prefix = role == 'Worker' ? 'WO' : 'JO';
-    final lastIdSnapshot = await _database.child("lastUserId").get();
+
+    final metaDoc = FirebaseFirestore.instance.collection('meta').doc('lastUserId');
+    final snapshot = await metaDoc.get();
 
     int lastId = 1000;
-    if (lastIdSnapshot.exists) {
-      lastId = int.tryParse(lastIdSnapshot.value.toString()) ?? 1000;
+    if (snapshot.exists && snapshot.data()?['last'] != null) {
+      lastId = snapshot.data()!['last'];
     }
 
     int newId = lastId + 1;
-    await _database.child("lastUserId").set(newId.toString());
+
+    await metaDoc.set({'last': newId});
 
     return '$prefix${newId.toString().padLeft(4, '0')}';
   }
@@ -68,9 +72,7 @@ class _Page5SummaryState extends State<Page5Summary> {
   void _saveToFirebase() async {
     if (!termsAccepted || isUserIdLoading || _isLoading) return;
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     String? base64Image;
     if (widget.userData.role == 'Worker' &&
@@ -95,60 +97,46 @@ class _Page5SummaryState extends State<Page5Summary> {
       "city": widget.userData.city,
       "area": widget.userData.area,
       "address": widget.userData.address,
-      "experience":
-      widget.userData.role == 'Worker' ? widget.userData.experience : "N/A",
-      "email-id":globalEmail,
+      "experience": widget.userData.role == 'Worker'
+          ? widget.userData.experience
+          : "N/A",
+      "email-id": globalEmail,
       "profileImageBase64": base64Image ?? "No Image",
-
-
-
     };
 
-    // Map<String, dynamic> userDataMap = {
-    //   "personalInformation": personalInfo,
-    //   "experience":
-    //       widget.userData.role == 'Worker' ? widget.userData.experience : "N/A",
-    //   "profileImageBase64": base64Image ?? "No Image",
-    // };
-    Map<String, dynamic> emailDataMap = {
-      "${globalEmail}": generatedUserId,
-
-    };
     try {
-      final userType =
-          widget.userData.role == "Worker" ? "workers" : "jobproviders";
+      final userType = widget.userData.role == "Worker" ? "workers" : "jobproviders";
 
-      await _database
-          .child("users")
-          .child(userType)
-          .child(userId)
-          .set(userDataMap);
+      // Firestore path: users/{userType}/{userId}
+      final userDoc = FirebaseFirestore.instance
+          .collection('users')
+          .doc(userType)
+          .collection(userType)
+          .doc(userId);
 
-      await _database.child("email").child(sanitizedEmail).set(userId);
+      await userDoc.set(userDataMap);
+
+      // Store sanitized email → userId mapping
+      await FirebaseFirestore.instance
+          .collection('emails')
+          .doc(sanitizedEmail)
+          .set({'userId': userId});
 
       widget.userData.userId = userId;
 
-
-
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
 
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder:
-              (context) => CheckboxAnimationPage(
-                success: true,
-                userData: widget.userData,
-              ),
+          builder: (context) => CheckboxAnimationPage(
+            success: true,
+            userData: widget.userData,
+          ),
         ),
       );
     } catch (error) {
-      setState(() {
-        _isLoading = false;
-      });
-
+      setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Failed to save data: $error'),
@@ -157,6 +145,7 @@ class _Page5SummaryState extends State<Page5Summary> {
       );
     }
   }
+
 
   @override
   Widget build(BuildContext context) {

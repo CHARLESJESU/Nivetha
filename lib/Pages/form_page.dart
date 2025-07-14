@@ -4,7 +4,12 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:path/path.dart' as path;
 import 'package:image_picker/image_picker.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:path_provider/path_provider.dart';
+
 
 class FormPage extends StatefulWidget {
   final String userId;
@@ -18,10 +23,11 @@ class FormPage extends StatefulWidget {
 class _FormPageState extends State<FormPage> {
   File? _imageFile;
   final TextEditingController _descriptionController = TextEditingController();
-  final DatabaseReference _dbRef = FirebaseDatabase.instance
-      .ref()
-      .child('jobs')
-      .child('workers');
+  final CollectionReference _jobCollection = FirebaseFirestore.instance
+      .collection('jobs')
+      .doc('workers')
+      .collection('workers');
+
   bool _isUploading = false;
 
   bool _showSuccessAnimation = false;
@@ -36,76 +42,121 @@ class _FormPageState extends State<FormPage> {
     }
   }
 
-  Future<String> _convertImageToBase64(File imageFile) async {
+
+  Future<String?> compressAndConvertToBase64(String imagePath) async {
     try {
-      List<int> imageBytes = await imageFile.readAsBytes();
-      return base64Encode(imageBytes);
+      // Get temporary directory
+      final tempDir = await getTemporaryDirectory();
+      final targetPath = path.join(
+        tempDir.path,
+        'compressed_${DateTime.now().millisecondsSinceEpoch}.jpg',
+      );
+
+      // Compress image
+      final compressedFile = await FlutterImageCompress.compressAndGetFile(
+        imagePath,
+        targetPath,
+        quality: 40,
+        format: CompressFormat.jpeg,
+      );
+
+      // Validate compression result
+      if (compressedFile == null || !await File(compressedFile.path).exists()) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Image compression failed.")),
+        );
+        return null;
+      }
+
+      // Read compressed image as bytes and encode to base64
+      final bytes = await compressedFile.readAsBytes();
+      print("Compressed size: ${bytes.length} bytes");
+      return base64Encode(bytes);
     } catch (e) {
-      print("Image conversion failed: $e");
-      return '';
+      print("Compression or conversion failed: $e");
+      return null;
     }
   }
+
 
   String _generateOrderId() {
     const chars =
         'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     final rand = Random.secure();
     final id =
-        List.generate(7, (index) => chars[rand.nextInt(chars.length)]).join();
+    List.generate(7, (index) => chars[rand.nextInt(chars.length)]).join();
     return id; // just the random string, no prefix here
   }
 
   Future<void> _uploadOrder() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("User not logged in")));
-      return;
-    }
-    if (_imageFile == null || _descriptionController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Please select an image and enter a description"),
-        ),
+        SnackBar(content: Text("User not logged in")),
       );
       return;
     }
+
+    if (_imageFile == null || _descriptionController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Please select an image and enter a description")),
+      );
+      return;
+    }
+
     setState(() {
       _isUploading = true;
     });
 
     try {
       final userId = widget.userId;
-      final base64Image = await _convertImageToBase64(_imageFile!);
-      final rawOrderId = _generateOrderId(); // e.g. "aB123xZ"
-      final orderKey = 'OID_$rawOrderId'; // e.g. "OID_aB123xZ"
-      final orderIdValue =
-          'OID_$rawOrderId'; // e.g. "OID_aB123xZ" (optional if you want the OID_ in displayed orderId)
+      print(_imageFile);
 
-      await _dbRef.child(userId).child(orderKey).set({
+      final base64Image = await compressAndConvertToBase64(_imageFile!.path);
+      print(base64Image);
+
+      final rawOrderId = _generateOrderId();
+      final orderKey = 'OID_$rawOrderId';
+
+      final userDocRef = FirebaseFirestore.instance
+          .collection('jobs')
+          .doc('workers')
+          .collection('workers')
+          .doc(userId);
+
+// ✅ First, set a field in the user doc
+      await userDocRef.set(
+          {'summa': 1}, SetOptions(merge: true)); // merge to avoid overwrite
+
+// ✅ Then, add order to the subcollection
+      await userDocRef
+          .collection('order')
+          .doc(orderKey)
+          .set({
+        'orderkey': orderKey,
         'description': _descriptionController.text,
         'imageBase64': base64Image,
       });
 
       setState(() {
         _showSuccessAnimation = true;
-        _generatedOrderId = orderIdValue;
+        _generatedOrderId = orderKey;
       });
 
       Future.delayed(Duration(seconds: 3), () {
         if (mounted) Navigator.of(context).pop();
       });
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Failed to post job: $e")));
+    }catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Failed to post job: $e")),
+      );
     } finally {
       setState(() {
         _isUploading = false;
       });
     }
   }
+
 
   @override
   void dispose() {
@@ -148,29 +199,29 @@ class _FormPageState extends State<FormPage> {
                   SizedBox(height: 20),
                   _imageFile != null
                       ? Container(
-                        height: 200,
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Image.file(
-                            _imageFile!,
-                            width: double.infinity,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                      )
-                      : Container(
-                        height: 200,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[200],
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.grey),
-                        ),
-                        child: Center(child: Text("No image selected")),
+                    height: 200,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.file(
+                        _imageFile!,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
                       ),
+                    ),
+                  )
+                      : Container(
+                    height: 200,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey),
+                    ),
+                    child: Center(child: Text("No image selected")),
+                  ),
                   SizedBox(height: 20),
                   Center(
                     child: ElevatedButton.icon(
@@ -193,9 +244,9 @@ class _FormPageState extends State<FormPage> {
                     child: ElevatedButton(
                       onPressed: _isUploading ? null : _uploadOrder,
                       child:
-                          _isUploading
-                              ? CircularProgressIndicator(color: Colors.white)
-                              : Text("Post"),
+                      _isUploading
+                          ? CircularProgressIndicator(color: Colors.white)
+                          : Text("Post"),
                       style: ElevatedButton.styleFrom(
                         padding: EdgeInsets.symmetric(
                           horizontal: 32,

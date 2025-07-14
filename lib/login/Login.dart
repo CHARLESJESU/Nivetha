@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 
@@ -21,7 +22,8 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
-  final DatabaseReference _database = FirebaseDatabase.instance.ref();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
   final _formKey = GlobalKey<FormState>();
   bool isLoading = false;
   String errorMessage = ''; // Store error message here
@@ -69,8 +71,18 @@ class _LoginScreenState extends State<LoginScreen> {
         } else {
           userType = "workers";
         }
-        final snapshot = await _database.child("users").child(userType).child(userexist).get();
-        final data = Map<String, dynamic>.from(snapshot.value as Map); // Ensure correct type
+        final snapshot = await _firestore
+            .collection('users')
+            .doc(userType)
+            .collection(userType) // Assuming nested subcollection with same name
+            .doc(userexist)
+            .get();
+
+
+         final data = snapshot.data() as Map<String, dynamic>;
+          //
+          // Now you can use `data['fieldName']` safely
+ // Ensure correct type
         final userData = UserData.fromJson(data);
         // Navigator.of(context).pushReplacement(
         //

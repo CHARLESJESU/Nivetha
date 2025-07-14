@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_database/firebase_database.dart';
@@ -56,11 +57,12 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
         userData.role.toLowerCase() == 'worker' ? 'workers' : 'jobproviders';
 
     // Save to Firebase under correct role path
-    final DatabaseReference ref = FirebaseDatabase.instance
-        .ref()
-        .child('users')
-        .child(rolePath)
-        .child(userData.userId);
+    final DocumentReference ref = FirebaseFirestore.instance
+        .collection('users')
+        .doc(rolePath)
+        .collection(rolePath)
+        .doc(userData.userId);
+
 
     await ref.set(userData.toJson());
 
