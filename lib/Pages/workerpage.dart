@@ -211,6 +211,12 @@ class _WorkerpageState extends State<Workerpage> {
 
     }
   }
+  Future<void> _refreshData() async {
+    // 👇 Add your refresh logic here
+    // For example, re-fetch user data or posts
+    await _loadAppliedJobs(); // if you have a method like this
+    setState(() {});
+  }
 
   Future<void> _applyForJob(String jobProviderUserId, String postId) async {
     final user = FirebaseAuth.instance.currentUser;
@@ -566,7 +572,11 @@ class _WorkerpageState extends State<Workerpage> {
           ),
         ),
         drawer: buildDrawer(),
-        body: _buildMainContent(),
+        body: RefreshIndicator(
+          onRefresh: _refreshData,
+          child: _buildMainContent(),
+        ),
+
         bottomNavigationBar: BottomNavigationBar(
           currentIndex: _selectedIndex,
           selectedItemColor: Colors.blueAccent,
