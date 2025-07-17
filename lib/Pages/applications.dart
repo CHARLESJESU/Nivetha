@@ -73,8 +73,8 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
   bool isLoading = true;
   StreamSubscription<DatabaseEvent>? _subscription;
 
-  // ✅ NEW: Track which orders have been confirmed
-  Set<String> confirmedOrders = {};
+  Set<String> decidedOrders = {}; // ✅ Track accept/reject per order
+  Set<String> confirmedWorkers = {}; // ✅ Track confirmed workers
 
   @override
   void initState() {
@@ -167,16 +167,16 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
 
       await batch.commit();
 
-      if (newStatus == 'rejected') {
+      if (newStatus == 'rejected' || newStatus == 'accepted') {
         setState(() {
           groupedApplications[orderId]!
               .firstWhere((app) => app.userId == workerUserId)
               .showDetails = false;
+          decidedOrders.add(orderId); // ✅ Mark order as handled
         });
       } else if (newStatus == 'confirmation') {
-        // ✅ Mark this order as confirmed
         setState(() {
-          confirmedOrders.add(orderId);
+          confirmedWorkers.add(workerUserId); // ✅ Confirm per worker
         });
       }
 
@@ -258,9 +258,9 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
   ) {
     bool showDetails = worker.showDetails;
     String status = worker.status;
-    bool isConfirmed = confirmedOrders.contains(
-      orderId,
-    ); // ✅ Check if confirmed
+
+    bool isDecided = decidedOrders.contains(orderId);
+    bool isConfirmed = confirmedWorkers.contains(worker.userId);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -344,7 +344,7 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
                           Expanded(
                             child: ElevatedButton(
                               onPressed:
-                                  (status == 'applied' && !isConfirmed)
+                                  (status == 'applied' && !isDecided)
                                       ? () => updateApplicationStatus(
                                         orderId,
                                         worker.userId,
@@ -367,7 +367,7 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
                           Expanded(
                             child: ElevatedButton(
                               onPressed:
-                                  (status == 'applied' && !isConfirmed)
+                                  (status == 'applied' && !isDecided)
                                       ? () => updateApplicationStatus(
                                         orderId,
                                         worker.userId,
