@@ -85,59 +85,62 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
     final ref = FirebaseFirestore.instance
         .collection('applications')
         .doc(widget.jobProviderUserId)
-        .collection('posts'); // adjust if structure differs
+        .collection('posts');
 
     _subscription?.cancel();
-    _subscription = ref.snapshots().listen(
-          (querySnapshot) async {
-        if (!mounted) return;
+    _subscription =
+        ref.snapshots().listen(
+              (querySnapshot) async {
+                if (!mounted) return;
 
-        Map<String, List<Application>> tempGroupedApps = {};
-         print("pdaljkdslflks");
-         print(querySnapshot.docs[0]);
-        for (var postDoc in querySnapshot.docs) {
-          final orderId = postDoc.id;
+                Map<String, List<Application>> tempGroupedApps = {};
+                for (var postDoc in querySnapshot.docs) {
+                  final orderId = postDoc.id;
 
-          // Each post has a subcollection of worker applications
-          final workersSnapshot = await postDoc.reference.collection('workers').get();
-          List<Application> workers = [];
+                  final workersSnapshot =
+                      await postDoc.reference.collection('workers').get();
+                  List<Application> workers = [];
 
-          for (var workerDoc in workersSnapshot.docs) {
-            final workerUserId = workerDoc.id;
-            final workerData = workerDoc.data();
+                  for (var workerDoc in workersSnapshot.docs) {
+                    final workerUserId = workerDoc.id;
+                    final workerData = workerDoc.data();
 
-            workers.add(Application.fromMap(workerUserId, workerData));
-          }
+                    workers.add(Application.fromMap(workerUserId, workerData));
+                  }
 
-          tempGroupedApps[orderId] = workers;
-        }
+                  tempGroupedApps[orderId] = workers;
+                }
 
-        setState(() {
-          groupedApplications = tempGroupedApps;
-          showOrderDetails = List.generate(tempGroupedApps.length, (_) => false);
-          isLoading = false;
-        });
-      },
-      onError: (error) {
-        if (!mounted) return;
-        setState(() => isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load applications: $error')),
-        );
-      },
-    ) as StreamSubscription<DatabaseEvent>? ;
+                setState(() {
+                  groupedApplications = tempGroupedApps;
+                  showOrderDetails = List.generate(
+                    tempGroupedApps.length,
+                    (_) => false,
+                  );
+                  isLoading = false;
+                });
+              },
+              onError: (error) {
+                if (!mounted) return;
+                setState(() => isLoading = false);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Failed to load applications: $error'),
+                  ),
+                );
+              },
+            )
+            as StreamSubscription<DatabaseEvent>?;
   }
 
-
   Future<void> updateApplicationStatus(
-      String orderId,
-      String workerUserId,
-      String newStatus,
-      ) async {
+    String orderId,
+    String workerUserId,
+    String newStatus,
+  ) async {
     try {
       final firestore = FirebaseFirestore.instance;
 
-      // References for both paths to update
       final applicationsRef = firestore
           .collection('applications')
           .doc(widget.jobProviderUserId)
@@ -154,7 +157,6 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
           .collection('posts')
           .doc(orderId);
 
-      // Perform batched update to both locations
       WriteBatch batch = firestore.batch();
 
       batch.update(applicationsRef, {'status': newStatus});
@@ -162,7 +164,6 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
 
       await batch.commit();
 
-      // Optional UI update for rejected status
       if (newStatus == 'rejected') {
         setState(() {
           groupedApplications[orderId]!
@@ -182,7 +183,6 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
       ).showSnackBar(SnackBar(content: Text('Failed to update status: $e')));
     }
   }
-
 
   Color getStatusColor(String status) {
     switch (status.toLowerCase()) {
@@ -371,6 +371,33 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
                               child: const Text(
                                 'Reject',
                                 style: TextStyle(color: Colors.white),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed:
+                                  status == 'applied'
+                                      ? () => updateApplicationStatus(
+                                        orderId,
+                                        worker.userId,
+                                        'confirmation',
+                                      )
+                                      : null,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.orange,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              child: const Text(
+                                'Confirmation',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 6,
+                                ),
                               ),
                             ),
                           ),

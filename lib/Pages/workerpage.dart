@@ -32,6 +32,7 @@ class _WorkerpageState extends State<Workerpage> {
   Map<String, JobProvider> jobProviderDetails = {};
   String? selectedCity;
   List<String> availableCities = [];
+  int unreadMessagesCount = 0;
 
   @override
   void initState() {
@@ -40,6 +41,7 @@ class _WorkerpageState extends State<Workerpage> {
     _initializePreferences();
     _loadAppliedJobs();
     _loadPosts();
+    _loadUnreadMessagesCount();
   }
 
   void _initializePreferences() async {
@@ -47,6 +49,30 @@ class _WorkerpageState extends State<Workerpage> {
     await prefs.setBool('isLoggedIn', true);
     await prefs.setBool('worker', true);
     await prefs.setString('userData', jsonEncode(widget.userData.toJson()));
+  }
+
+  Future<void> _loadUnreadMessagesCount() async {
+    final workerId = userData.userId;
+    final messagesRef = FirebaseFirestore.instance
+        .collection('messages')
+        .doc('worker_$workerId')
+        .collection('chats');
+
+    final snapshot = await messagesRef.get();
+
+    int count = 0;
+    for (var doc in snapshot.docs) {
+      final lastMessage = doc.data()['lastMessage'] as Map<String, dynamic>?;
+      if (lastMessage != null &&
+          lastMessage['isRead'] == false &&
+          lastMessage['senderId'] != workerId) {
+        count++;
+      }
+    }
+
+    setState(() {
+      unreadMessagesCount = count;
+    });
   }
 
   Future<void> _loadAppliedJobs() async {
@@ -79,17 +105,12 @@ class _WorkerpageState extends State<Workerpage> {
       Set<String> cities = {};
       for (final workerDoc in workersSnapshot.docs) {
         try {
-
           final userId = workerDoc.id;
 
-          final ordersSnapshot = await workerDoc.reference
-              .collection('order')
-              .get();
+          final ordersSnapshot =
+              await workerDoc.reference.collection('order').get();
           for (final orderDoc in ordersSnapshot.docs) {
-
             final data = orderDoc.data();
-
-
             fetchedPosts.add(
               Post(
                 userId: userId,
@@ -101,13 +122,13 @@ class _WorkerpageState extends State<Workerpage> {
             );
           }
 
-          // Fetch job provider details
-          final providerSnapshot = await FirebaseFirestore.instance
-              .collection('users')
-              .doc('jobproviders')
-              .collection('jobproviders')
-              .doc(userId)
-              .get();
+          final providerSnapshot =
+              await FirebaseFirestore.instance
+                  .collection('users')
+                  .doc('jobproviders')
+                  .collection('jobproviders')
+                  .doc(userId)
+                  .get();
 
           if (providerSnapshot.exists) {
             final data = providerSnapshot.data()!;
@@ -133,11 +154,9 @@ class _WorkerpageState extends State<Workerpage> {
           }
         } catch (e) {
           print("Error processing workerDoc ${workerDoc.id}: $e");
-          continue; // Skip to next workerDoc
+          continue;
         }
-
       }
-
 
       fetchedPosts.sort((a, b) => b.postId.compareTo(a.postId));
 
@@ -152,7 +171,6 @@ class _WorkerpageState extends State<Workerpage> {
       setState(() => isLoading = false);
     }
   }
-
 
   Future<void> _pickImage() async {
     final picker = ImagePicker();
@@ -208,10 +226,8 @@ class _WorkerpageState extends State<Workerpage> {
           SnackBar(content: Text('Failed to update profile image: $e')),
         );
       }
-
     }
   }
-
 
   Future<void> _applyForJob(String jobProviderUserId, String postId) async {
     final user = FirebaseAuth.instance.currentUser;
@@ -266,16 +282,9 @@ class _WorkerpageState extends State<Workerpage> {
           .collection('posts')
           .doc(postId);
 
-// ✅ Set a dummy or useful field to ensure `postId` exists
       await postRef.set({'active': true}, SetOptions(merge: true));
 
-// ✅ Then save the worker under 'workers' collection
-      await postRef
-          .collection('workers')
-          .doc(workerUserId)
-          .set(workerDetails);
-
-
+      await postRef.collection('workers').doc(workerUserId).set(workerDetails);
 
       final appliedJobDetails = {
         'orderId': post.orderId,
@@ -291,16 +300,12 @@ class _WorkerpageState extends State<Workerpage> {
           .collection('jobProviders')
           .doc(jobProviderUserId);
 
-// ✅ Ensure the jobProvider document exists with at least one field
-      await jobRef.set({'summa': 1}, SetOptions(merge: true)); // Or use any meaningful field
+      await jobRef.set({'summa': 1}, SetOptions(merge: true));
 
-// ✅ Now save the post inside 'posts' subcollection
-      await jobRef
-          .collection('posts')
-          .doc(postId)
-          .set(appliedJobDetails);
+      await jobRef.collection('posts').doc(postId).set(appliedJobDetails);
 
-
+      // Initialize chat between worker and job provider
+      await _initializeChat(jobProviderUserId);
 
       setState(() => appliedJobs[postId] = true);
       await _saveAppliedJob(postId);
@@ -312,6 +317,50 @@ class _WorkerpageState extends State<Workerpage> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text("Failed to apply to the job: $e")));
+    }
+  }
+
+  Future<void> _initializeChat(String jobProviderId) async {
+    try {
+      final workerId = userData.userId;
+      final workerName = userData.name;
+
+      // Create chat in worker's messages
+      await FirebaseFirestore.instance
+          .collection('messages')
+          .doc('worker_$workerId')
+          .collection('chats')
+          .doc(jobProviderId)
+          .set({
+            'jobProviderId': jobProviderId,
+            'jobProviderName':
+                jobProviderDetails[jobProviderId]?.name ?? 'Unknown',
+            'lastMessage': {
+              'text': 'Chat initiated',
+              'timestamp': DateTime.now().toIso8601String(),
+              'isRead': true,
+              'senderId': workerId,
+            },
+          });
+
+      // Create chat in job provider's messages
+      await FirebaseFirestore.instance
+          .collection('messages')
+          .doc('provider_$jobProviderId')
+          .collection('chats')
+          .doc(workerId)
+          .set({
+            'workerId': workerId,
+            'workerName': workerName,
+            'lastMessage': {
+              'text': 'Chat initiated',
+              'timestamp': DateTime.now().toIso8601String(),
+              'isRead': false,
+              'senderId': workerId,
+            },
+          });
+    } catch (e) {
+      print("Error initializing chat: $e");
     }
   }
 
@@ -343,8 +392,14 @@ class _WorkerpageState extends State<Workerpage> {
           Expanded(child: buildJobPosts()),
         ],
       );
-    } else {
+    } else if (_selectedIndex == 1) {
       return JobStatusPage(userData: userData);
+    } else {
+      return MessagesPage(
+        workerId: userData.userId,
+        workerName: userData.name,
+        onMessageRead: _loadUnreadMessagesCount,
+      );
     }
   }
 
@@ -384,14 +439,17 @@ class _WorkerpageState extends State<Workerpage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          "Job Provider Id: ${post.userId}",
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.blueAccent,
+                        Expanded(
+                          child: Text(
+                            "Job Provider: $providerName",
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blueAccent,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         IconButton(
@@ -547,13 +605,22 @@ class _WorkerpageState extends State<Workerpage> {
     final backController = Get.put(BackButtonController());
     final scaffoldKey = GlobalKey<ScaffoldState>();
 
-    return WillPopScope(
-      onWillPop: backController.handleWillPop,
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) async {
+        if (!didPop) {
+          backController.handleWillPop();
+        }
+      },
       child: Scaffold(
         key: scaffoldKey,
         appBar: AppBar(
           title: Text(
-            _selectedIndex == 0 ? 'Welcome, ${userData.name}' : 'Job Status',
+            _selectedIndex == 0
+                ? 'Welcome, ${userData.name}'
+                : _selectedIndex == 1
+                ? 'Job Status'
+                : 'Messages',
             style: TextStyle(
               fontWeight: FontWeight.bold,
               color: Colors.white,
@@ -565,22 +632,91 @@ class _WorkerpageState extends State<Workerpage> {
             icon: _buildProfileAvatar(radius: 20),
             onPressed: () => scaffoldKey.currentState?.openDrawer(),
           ),
+          actions:
+              _selectedIndex == 2
+                  ? [
+                    Stack(
+                      children: [
+                        IconButton(
+                          icon: Icon(Icons.refresh),
+                          onPressed: () {
+                            _loadUnreadMessagesCount();
+                            if (_MessagesPageState.currentState != null) {
+                              _MessagesPageState.currentState!._loadChats();
+                            }
+                          },
+                        ),
+                        if (unreadMessagesCount > 0)
+                          Positioned(
+                            right: 8,
+                            top: 8,
+                            child: Container(
+                              padding: EdgeInsets.all(2),
+                              decoration: BoxDecoration(
+                                color: Colors.red,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              constraints: BoxConstraints(
+                                minWidth: 16,
+                                minHeight: 16,
+                              ),
+                              child: Text(
+                                unreadMessagesCount.toString(),
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ]
+                  : null,
         ),
         drawer: buildDrawer(),
         body: RefreshIndicator(
-          onRefresh:_loadPosts,
+          onRefresh: _loadPosts,
           child: _buildMainContent(),
         ),
-
         bottomNavigationBar: BottomNavigationBar(
           currentIndex: _selectedIndex,
           selectedItemColor: Colors.blueAccent,
           onTap: (index) => setState(() => _selectedIndex = index),
-          items: const [
+          items: [
             BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
             BottomNavigationBarItem(
               icon: Icon(Icons.assignment),
               label: 'Job Status',
+            ),
+            BottomNavigationBarItem(
+              icon: Stack(
+                children: [
+                  Icon(Icons.message),
+                  if (unreadMessagesCount > 0)
+                    Positioned(
+                      right: 0,
+                      child: Container(
+                        padding: EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        constraints: BoxConstraints(
+                          minWidth: 16,
+                          minHeight: 16,
+                        ),
+                        child: Text(
+                          unreadMessagesCount.toString(),
+                          style: TextStyle(color: Colors.white, fontSize: 10),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              label: 'Messages',
             ),
           ],
         ),
@@ -611,6 +747,12 @@ class _WorkerpageState extends State<Workerpage> {
                       decoration: BoxDecoration(
                         color: Colors.white,
                         shape: BoxShape.circle,
+                      ),
+                      padding: EdgeInsets.all(3),
+                      child: Icon(
+                        Icons.edit,
+                        size: 20,
+                        color: Colors.blueAccent,
                       ),
                     ),
                   ),
@@ -681,256 +823,465 @@ class _WorkerpageState extends State<Workerpage> {
   }
 }
 
-class ProfilePage extends StatefulWidget {
-  final UserData userData;
-  const ProfilePage({Key? key, required this.userData}) : super(key: key);
+class MessagesPage extends StatefulWidget {
+  final String workerId;
+  final String workerName;
+  final VoidCallback onMessageRead;
+
+  const MessagesPage({
+    required this.workerId,
+    required this.workerName,
+    required this.onMessageRead,
+    Key? key,
+  }) : super(key: key);
 
   @override
-  _ProfilePageState createState() => _ProfilePageState();
+  _MessagesPageState createState() => _MessagesPageState();
 }
 
-class _ProfilePageState extends State<ProfilePage> {
-  late UserData userData;
-  bool isEditing = false;
-  Map<String, TextEditingController> controllers = {};
+class _MessagesPageState extends State<MessagesPage> {
+  final TextEditingController _messageController = TextEditingController();
+  final FocusNode _messageFocusNode = FocusNode();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final ScrollController _scrollController = ScrollController();
+
+  Map<String, Map<String, dynamic>> _chats = {};
+  bool _isLoading = true;
+  String? _selectedChatId;
+  List<Map<String, dynamic>> _messages = [];
+  bool _isSending = false;
+
+  static _MessagesPageState? currentState;
 
   @override
   void initState() {
     super.initState();
-    userData = widget.userData;
-    controllers = {
-      'name': TextEditingController(text: userData.name),
-      'role': TextEditingController(text: userData.role),
-      'gender': TextEditingController(text: userData.gender),
-      'dob': TextEditingController(
-        text: userData.dob?.toLocal().toString().split(' ')[0] ?? '',
-      ),
-      'phone': TextEditingController(text: userData.phoneNumber),
-      'country': TextEditingController(text: userData.country),
-      'state': TextEditingController(text: userData.state),
-      'district': TextEditingController(text: userData.district),
-      'city': TextEditingController(text: userData.city),
-      'area': TextEditingController(text: userData.area),
-      'address': TextEditingController(text: userData.address),
-      'experience': TextEditingController(text: userData.experience ?? ''),
-    };
+    currentState = this;
+    _loadChats();
+    _setupMessageListener();
   }
 
   @override
   void dispose() {
-    controllers.values.forEach((controller) => controller.dispose());
+    currentState = null;
+    _messageController.dispose();
+    _messageFocusNode.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
-  void _saveChanges() async {
+  Future<void> _loadChats() async {
+    try {
+      final snapshot =
+          await _firestore
+              .collection('messages')
+              .doc('worker_${widget.workerId}')
+              .collection('chats')
+              .get();
+
+      setState(() {
+        _chats = {for (var doc in snapshot.docs) doc.id: doc.data()};
+        _isLoading = false;
+      });
+    } catch (e) {
+      print("Error loading chats: $e");
+      setState(() => _isLoading = false);
+    }
+  }
+
+  void _setupMessageListener() {
+    if (_selectedChatId != null) {
+      _firestore
+          .collection('messages')
+          .doc('worker_${widget.workerId}')
+          .collection('chats')
+          .doc(_selectedChatId!)
+          .collection('messages')
+          .orderBy('timestamp', descending: true)
+          .snapshots()
+          .listen((snapshot) {
+            if (snapshot.docs.isNotEmpty) {
+              setState(() {
+                _messages = snapshot.docs.map((doc) => doc.data()).toList();
+              });
+              _scrollToBottom();
+            }
+          });
+    }
+  }
+
+  Future<void> _loadMessages(String chatId) async {
     setState(() {
-      userData = UserData(
-        userId: userData.userId,
-        name: controllers['name']!.text,
-        role: controllers['role']!.text,
-        gender: controllers['gender']!.text,
-        dob: DateTime.tryParse(controllers['dob']!.text),
-        phoneNumber: controllers['phone']!.text,
-        country: controllers['country']!.text,
-        state: controllers['state']!.text,
-        district: controllers['district']!.text,
-        city: controllers['city']!.text,
-        area: controllers['area']!.text,
-        address: controllers['address']!.text,
-        profileImage: userData.profileImage,
-        experience: controllers['experience']!.text,
-      );
-      isEditing = false;
+      _selectedChatId = chatId;
+      _messages = [];
+      _isLoading = true;
     });
 
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.setString('userData', jsonEncode(userData.toJson()));
-
     try {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc('workers')
-          .collection('workers')
-          .doc(userData.userId)
-          .update(userData.toJson());
+      final snapshot =
+          await _firestore
+              .collection('messages')
+              .doc('worker_${widget.workerId}')
+              .collection('chats')
+              .doc(chatId)
+              .collection('messages')
+              .orderBy('timestamp', descending: true)
+              .limit(50)
+              .get();
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Profile updated successfully')));
+      // Mark messages as read
+      final batch = _firestore.batch();
+      for (var doc in snapshot.docs) {
+        final message = doc.data();
+        if (message['senderId'] != widget.workerId &&
+            message['isRead'] == false) {
+          batch.update(doc.reference, {'isRead': true});
+        }
+      }
+      await batch.commit();
+
+      // Update last message read status
+      if (snapshot.docs.isNotEmpty) {
+        final lastMessage = snapshot.docs.first.data();
+        if (lastMessage['senderId'] != widget.workerId) {
+          await _firestore
+              .collection('messages')
+              .doc('worker_${widget.workerId}')
+              .collection('chats')
+              .doc(chatId)
+              .update({'lastMessage.isRead': true});
+        }
+      }
+
+      setState(() {
+        _messages = snapshot.docs.map((doc) => doc.data()).toList();
+        _isLoading = false;
+      });
+
+      widget.onMessageRead();
+      _scrollToBottom();
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to update profile: $e')));
+      print("Error loading messages: $e");
+      setState(() => _isLoading = false);
     }
   }
 
-  Widget _buildProfileDetail(
-    String label,
-    String value, {
-    bool isEditable = false,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            flex: 2,
-            child: Text(
-              '$label:',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
-          ),
-          Expanded(
-            flex: 3,
-            child:
-                isEditing && isEditable
-                    ? TextField(
-                      controller: controllers[label.toLowerCase()],
-                      decoration: InputDecoration(
-                        border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 8),
-                      ),
-                    )
-                    : Text(value, style: TextStyle(fontSize: 16)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _pickImage() async {
-    final picker = ImagePicker();
-    final XFile? image = await showModalBottomSheet<XFile?>(
-      context: context,
-      builder:
-          (context) => SafeArea(
-            child: Wrap(
-              children: [
-                ListTile(
-                  leading: Icon(Icons.camera_alt),
-                  title: Text('Take Photo'),
-                  onTap: () async {
-                    final picked = await picker.pickImage(
-                      source: ImageSource.camera,
-                    );
-                    Navigator.pop(context, picked);
-                  },
-                ),
-                ListTile(
-                  leading: Icon(Icons.photo_library),
-                  title: Text('Choose from Gallery'),
-                  onTap: () async {
-                    final picked = await picker.pickImage(
-                      source: ImageSource.gallery,
-                    );
-                    Navigator.pop(context, picked);
-                  },
-                ),
-              ],
-            ),
-          ),
-    );
-
-    if (image != null) {
-      setState(() {
-        userData.profileImage = image.path;
-      });
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      await prefs.setString('userData', jsonEncode(userData.toJson()));
-      try {
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc('workers')
-            .collection('workers')
-            .doc(userData.userId)
-            .update({'profileImage': image.path});
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Profile image updated successfully')),
-        );
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update profile image: $e')),
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          0,
+          duration: Duration(milliseconds: 300),
+          curve: Curves.easeOut,
         );
       }
+    });
+  }
+
+  Future<void> _sendMessage() async {
+    if (_messageController.text.trim().isEmpty || _selectedChatId == null)
+      return;
+
+    final messageId = DateTime.now().millisecondsSinceEpoch.toString();
+    final messageData = {
+      'messageId': messageId,
+      'text': _messageController.text.trim(),
+      'senderId': widget.workerId,
+      'senderName': widget.workerName,
+      'timestamp': DateTime.now().toIso8601String(),
+      'isRead': false,
+    };
+
+    setState(() => _isSending = true);
+
+    try {
+      // Add message to messages subcollection
+      await _firestore
+          .collection('messages')
+          .doc('worker_${widget.workerId}')
+          .collection('chats')
+          .doc(_selectedChatId!)
+          .collection('messages')
+          .doc(messageId)
+          .set(messageData);
+
+      // Update last message in chat
+      await _firestore
+          .collection('messages')
+          .doc('worker_${widget.workerId}')
+          .collection('chats')
+          .doc(_selectedChatId!)
+          .update({'lastMessage': messageData});
+
+      // Also update the job provider's chat
+      await _firestore
+          .collection('messages')
+          .doc('provider_$_selectedChatId')
+          .collection('chats')
+          .doc(widget.workerId)
+          .set({
+            'jobProviderId': _selectedChatId,
+            'workerId': widget.workerId,
+            'workerName': widget.workerName,
+            'lastMessage': messageData,
+          }, SetOptions(merge: true));
+
+      // Add message to job provider's messages
+      await _firestore
+          .collection('messages')
+          .doc('provider_$_selectedChatId')
+          .collection('chats')
+          .doc(widget.workerId)
+          .collection('messages')
+          .doc(messageId)
+          .set(messageData);
+
+      _messageController.clear();
+      _scrollToBottom();
+    } catch (e) {
+      print("Error sending message: $e");
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Failed to send message")));
+    } finally {
+      setState(() => _isSending = false);
     }
+  }
+
+  void _sendQuickReply(String message) {
+    _messageController.text = message;
+    _sendMessage();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Profile Details'),
-        backgroundColor: Colors.blueAccent,
-        actions: [
-          if (!isEditing)
-            IconButton(
-              icon: Icon(Icons.edit),
-              onPressed: () => setState(() => isEditing = true),
-            ),
-          if (isEditing)
-            IconButton(icon: Icon(Icons.save), onPressed: _saveChanges),
-          if (isEditing)
-            IconButton(
-              icon: Icon(Icons.cancel),
-              onPressed: () => setState(() => isEditing = false),
-            ),
-        ],
-      ),
-      body: ListView(
-        padding: EdgeInsets.all(16.0),
-        children: [
-          Center(
-            child: Stack(
-              children: [
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: GestureDetector(
-                    onTap: _pickImage,
+    return _isLoading
+        ? Center(child: CircularProgressIndicator())
+        : _selectedChatId == null
+        ? _buildChatList()
+        : _buildChatScreen();
+  }
+
+  Widget _buildChatList() {
+    return ListView.builder(
+      itemCount: _chats.length,
+      itemBuilder: (context, index) {
+        final chatId = _chats.keys.elementAt(index);
+        final chat = _chats[chatId]!;
+        final lastMessage = chat['lastMessage'] as Map<String, dynamic>?;
+        final isUnread =
+            lastMessage != null &&
+            lastMessage['isRead'] == false &&
+            lastMessage['senderId'] != widget.workerId;
+
+        return ListTile(
+          leading: CircleAvatar(
+            child: Text(chat['jobProviderName']?.substring(0, 1) ?? '?'),
+          ),
+          title: Text(chat['jobProviderName'] ?? 'Unknown'),
+          subtitle: Text(
+            lastMessage?['text'] ?? 'No messages yet',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          trailing: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                lastMessage != null
+                    ? _formatTime(lastMessage['timestamp'])
+                    : '',
+                style: TextStyle(fontSize: 12),
+              ),
+              if (isUnread)
+                Container(
+                  margin: EdgeInsets.only(top: 4),
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+            ],
+          ),
+          onTap: () => _loadMessages(chatId),
+        );
+      },
+    );
+  }
+
+  Widget _buildChatScreen() {
+    final chat = _chats[_selectedChatId]!;
+    final jobProviderName = chat['jobProviderName'] ?? 'Unknown';
+
+    return Column(
+      children: [
+        AppBar(
+          title: Text(jobProviderName),
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back),
+            onPressed: () {
+              setState(() => _selectedChatId = null);
+              _loadChats();
+            },
+          ),
+        ),
+        Expanded(
+          child: ListView.builder(
+            controller: _scrollController,
+            reverse: true,
+            itemCount: _messages.length,
+            itemBuilder: (context, index) {
+              final message = _messages[index];
+              final isMe = message['senderId'] == widget.workerId;
+
+              return Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: Align(
+                  alignment:
+                      isMe ? Alignment.centerRight : Alignment.centerLeft,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: MediaQuery.of(context).size.width * 0.75,
+                    ),
                     child: Container(
+                      padding: EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
+                        color: isMe ? Colors.blue[100] : Colors.grey[300],
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      padding: EdgeInsets.all(3),
-                      child: Icon(
-                        Icons.edit,
-                        size: 24,
-                        color: Colors.blueAccent,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (!isMe)
+                            Text(
+                              message['senderName'],
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blue[800],
+                              ),
+                            ),
+                          SizedBox(height: 4),
+                          Text(message['text']),
+                          SizedBox(height: 4),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                _formatTime(message['timestamp']),
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                              if (isMe)
+                                Padding(
+                                  padding: EdgeInsets.only(left: 4),
+                                  child: Icon(
+                                    message['isRead'] == true
+                                        ? Icons.done_all
+                                        : Icons.done,
+                                    size: 12,
+                                    color:
+                                        message['isRead'] == true
+                                            ? Colors.blue
+                                            : Colors.grey,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
                   ),
                 ),
-              ],
-            ),
+              );
+            },
           ),
-          SizedBox(height: 20),
-          _buildProfileDetail('Name', userData.name, isEditable: true),
-          _buildProfileDetail('Role', userData.role, isEditable: true),
-          _buildProfileDetail('Gender', userData.gender, isEditable: true),
-          _buildProfileDetail(
-            'DOB',
-            userData.dob?.toLocal().toString().split(' ')[0] ?? 'Not Set',
-            isEditable: true,
+        ),
+        _buildMessageInput(),
+      ],
+    );
+  }
+
+  Widget _buildMessageInput() {
+    return Container(
+      padding: EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: Colors.grey[300]!, width: 1)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              TextButton(
+                onPressed: () => _sendQuickReply('Yes, I am Interested'),
+                child: Text('Yes, I am Interested'),
+              ),
+              TextButton(
+                onPressed: () => _sendQuickReply('No, I am Not Interested'),
+                child: Text('No, I am Not Interested'),
+              ),
+            ],
           ),
-          _buildProfileDetail('Phone', userData.phoneNumber, isEditable: true),
-          _buildProfileDetail('Country', userData.country, isEditable: true),
-          _buildProfileDetail('State', userData.state, isEditable: true),
-          _buildProfileDetail('District', userData.district, isEditable: true),
-          _buildProfileDetail('City', userData.city, isEditable: true),
-          _buildProfileDetail('Area', userData.area, isEditable: true),
-          _buildProfileDetail('Address', userData.address, isEditable: true),
-          if (userData.role == 'Worker')
-            _buildProfileDetail(
-              'Experience',
-              userData.experience ?? '',
-              isEditable: true,
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _messageController,
+                  focusNode: _messageFocusNode,
+                  decoration: InputDecoration(
+                    hintText: 'Type a message...',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(24),
+                      borderSide: BorderSide.none,
+                    ),
+                    filled: true,
+                    fillColor: Colors.grey[200],
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                  ),
+                  maxLines: null,
+                  onSubmitted: (_) => _sendMessage(),
+                ),
+              ),
+              SizedBox(width: 8),
+              CircleAvatar(
+                backgroundColor: Colors.blue,
+                child: IconButton(
+                  icon:
+                      _isSending
+                          ? SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation(Colors.white),
+                            ),
+                          )
+                          : Icon(Icons.send, color: Colors.white),
+                  onPressed: _sendMessage,
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
+  }
+
+  String _formatTime(String timestamp) {
+    try {
+      final dateTime = DateTime.parse(timestamp).toLocal();
+      return '${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
+    } catch (e) {
+      return '';
+    }
   }
 }
 
