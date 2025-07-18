@@ -7,8 +7,6 @@ import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:nivetha123/Pages/messages.dart';
-import 'package:nivetha123/Pages/worker_message.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../login/Login.dart';
 import '../screens/user_data.dart';
@@ -329,10 +327,8 @@ class _WorkerpageState extends State<Workerpage> {
           Expanded(child: buildJobPosts()),
         ],
       );
-    } else if (_selectedIndex == 1) {
-      return JobStatusPage(userData: userData);
     } else {
-      return MessageWorkerPage(userData: userData);
+      return JobStatusPage(userData: userData);
     }
   }
 
@@ -569,10 +565,6 @@ class _WorkerpageState extends State<Workerpage> {
             BottomNavigationBarItem(
               icon: Icon(Icons.assignment),
               label: 'Job Status',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.message),
-              label: 'Messages',
             ),
           ],
         ),
