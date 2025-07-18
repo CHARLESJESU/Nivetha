@@ -1,3 +1,4 @@
+// At the top (your imports remain unchanged)
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -73,8 +74,11 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
   bool isLoading = true;
   StreamSubscription<DatabaseEvent>? _subscription;
 
-  Set<String> decidedOrders = {}; // ✅ Track accept/reject per order
-  Set<String> confirmedWorkers = {}; // ✅ Track confirmed workers
+  Set<String> decidedOrders = {}; // Accept/reject per order
+  Set<String> confirmedWorkers = {}; // Confirmed workers globally
+
+  // ✅ NEW: Track confirmed worker per job (order)
+  Map<String, String> confirmedWorkerPerOrder = {};
 
   @override
   void initState() {
@@ -97,6 +101,8 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
                 if (!mounted) return;
 
                 Map<String, List<Application>> tempGroupedApps = {};
+                Map<String, String> tempConfirmed = {};
+
                 for (var postDoc in querySnapshot.docs) {
                   final orderId = postDoc.id;
 
@@ -108,7 +114,17 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
                     final workerUserId = workerDoc.id;
                     final workerData = workerDoc.data();
 
-                    workers.add(Application.fromMap(workerUserId, workerData));
+                    Application app = Application.fromMap(
+                      workerUserId,
+                      workerData,
+                    );
+                    workers.add(app);
+
+                    // ✅ Track the confirmed worker for this order
+                    if (app.status == 'confirmation') {
+                      tempConfirmed[orderId] = workerUserId;
+                      confirmedWorkers.add(workerUserId);
+                    }
                   }
 
                   tempGroupedApps[orderId] = workers;
@@ -116,6 +132,7 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
 
                 setState(() {
                   groupedApplications = tempGroupedApps;
+                  confirmedWorkerPerOrder = tempConfirmed;
                   showOrderDetails = List.generate(
                     tempGroupedApps.length,
                     (_) => false,
@@ -172,11 +189,12 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
           groupedApplications[orderId]!
               .firstWhere((app) => app.userId == workerUserId)
               .showDetails = false;
-          decidedOrders.add(orderId); // ✅ Mark order as handled
+          decidedOrders.add(orderId);
         });
       } else if (newStatus == 'confirmation') {
         setState(() {
-          confirmedWorkers.add(workerUserId); // ✅ Confirm per worker
+          confirmedWorkers.add(workerUserId);
+          confirmedWorkerPerOrder[orderId] = workerUserId; // ✅ Save confirmed
         });
       }
 
@@ -200,6 +218,8 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
         return Colors.green;
       case 'rejected':
         return Colors.red;
+      case 'confirmation':
+        return Colors.orange;
       default:
         return Colors.grey;
     }
@@ -261,6 +281,11 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
 
     bool isDecided = decidedOrders.contains(orderId);
     bool isConfirmed = confirmedWorkers.contains(worker.userId);
+
+    // ✅ Disable confirmation button if someone else in the same order is already confirmed
+    bool anotherConfirmed =
+        confirmedWorkerPerOrder[orderId] != null &&
+        confirmedWorkerPerOrder[orderId] != worker.userId;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -390,7 +415,9 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
                           Expanded(
                             child: ElevatedButton(
                               onPressed:
-                                  (status == 'applied' && !isConfirmed)
+                                  (status == 'applied' &&
+                                          !isConfirmed &&
+                                          !anotherConfirmed)
                                       ? () => updateApplicationStatus(
                                         orderId,
                                         worker.userId,
