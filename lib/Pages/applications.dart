@@ -1,4 +1,3 @@
-// At the top (your imports remain unchanged)
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -74,10 +73,8 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
   bool isLoading = true;
   StreamSubscription<DatabaseEvent>? _subscription;
 
-  Set<String> decidedOrders = {}; // Accept/reject per order
-  Set<String> confirmedWorkers = {}; // Confirmed workers globally
-
-  // ✅ NEW: Track confirmed worker per job (order)
+  Set<String> decidedOrders = {};
+  Set<String> confirmedWorkers = {};
   Map<String, String> confirmedWorkerPerOrder = {};
 
   @override
@@ -120,7 +117,6 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
                     );
                     workers.add(app);
 
-                    // ✅ Track the confirmed worker for this order
                     if (app.status == 'confirmation') {
                       tempConfirmed[orderId] = workerUserId;
                       confirmedWorkers.add(workerUserId);
@@ -151,6 +147,20 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
               },
             )
             as StreamSubscription<DatabaseEvent>?;
+  }
+
+  // ✅ Helper method to send confirmation message to worker
+  Future<void> sendMessageToWorker(String workerUserId, String message) async {
+    final messageRef = FirebaseFirestore.instance
+        .collection('messages')
+        .doc(workerUserId)
+        .collection('inbox');
+
+    await messageRef.add({
+      'message': message,
+      'timestamp': FieldValue.serverTimestamp(),
+      'from': widget.jobProviderUserId,
+    });
   }
 
   Future<void> updateApplicationStatus(
@@ -194,8 +204,14 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
       } else if (newStatus == 'confirmation') {
         setState(() {
           confirmedWorkers.add(workerUserId);
-          confirmedWorkerPerOrder[orderId] = workerUserId; // ✅ Save confirmed
+          confirmedWorkerPerOrder[orderId] = workerUserId;
         });
+
+        // ✅ Send confirmation message
+        await sendMessageToWorker(
+          workerUserId,
+          'You have been marked for confirmation for job Order ID: $orderId.',
+        );
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -282,7 +298,6 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
     bool isDecided = decidedOrders.contains(orderId);
     bool isConfirmed = confirmedWorkers.contains(worker.userId);
 
-    // ✅ Disable confirmation button if someone else in the same order is already confirmed
     bool anotherConfirmed =
         confirmedWorkerPerOrder[orderId] != null &&
         confirmedWorkerPerOrder[orderId] != worker.userId;
@@ -417,7 +432,8 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
                               onPressed:
                                   (status == 'applied' &&
                                           !isConfirmed &&
-                                          !anotherConfirmed)
+                                          !anotherConfirmed &&
+                                          !isDecided)
                                       ? () => updateApplicationStatus(
                                         orderId,
                                         worker.userId,
