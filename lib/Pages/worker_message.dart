@@ -1,129 +1,158 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
-class ConfirmationMessagesPage extends StatefulWidget {
+class ConfirmationMessagesPage extends StatelessWidget {
   final String workerId;
-  final String workerName;
 
-  const ConfirmationMessagesPage({
-    Key? key,
-    required this.workerId,
-    required this.workerName,
-  }) : super(key: key);
+  const ConfirmationMessagesPage({Key? key, required this.workerId})
+    : super(key: key);
 
-  @override
-  _ConfirmationMessagesPageState createState() =>
-      _ConfirmationMessagesPageState();
-}
+  Future<void> sendResponseMessage({
+    required String jobProviderId,
+    required String postId,
+    required String response,
+    required String senderWorkerId,
+  }) async {
+    final FirebaseFirestore firestore = FirebaseFirestore.instance;
+    final Timestamp now = Timestamp.now();
 
-class _ConfirmationMessagesPageState extends State<ConfirmationMessagesPage> {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+    // Send reply to job provider
+    await firestore
+        .collection('messages')
+        .doc('jobprovider_$jobProviderId')
+        .collection('chats')
+        .add({
+          'text': response,
+          'senderId': senderWorkerId,
+          'receiverId': jobProviderId,
+          'senderType': 'worker',
+          'receiverType': 'job_provider',
+          'timestamp': now,
+          'postId': postId,
+          'isRead': false,
+        });
+
+    // Optionally store the response on the worker side too
+    await firestore
+        .collection('messages')
+        .doc('worker_$senderWorkerId')
+        .collection('chats')
+        .add({
+          'text': "You replied: $response",
+          'senderId': senderWorkerId,
+          'receiverId': jobProviderId,
+          'senderType': 'worker',
+          'receiverType': 'job_provider',
+          'timestamp': now,
+          'postId': postId,
+          'isRead': true,
+        });
+  }
 
   @override
   Widget build(BuildContext context) {
+    final FirebaseFirestore firestore = FirebaseFirestore.instance;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Welcome, Swetha"),
-        backgroundColor: Colors.blue,
+        title: const Text('Confirmation Messages'),
+        backgroundColor: Colors.orange,
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream:
-            _firestore
+            firestore
                 .collection('messages')
-                .doc('worker_${widget.workerId}')
+                .doc('worker_$workerId')
                 .collection('chats')
-                .where('senderType', isEqualTo: 'job_provider')
-                .where('responded', isEqualTo: false)
                 .orderBy('timestamp', descending: true)
                 .snapshots(),
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
+          if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final messages = snapshot.data?.docs ?? [];
+          final messages = snapshot.data!.docs;
 
           if (messages.isEmpty) {
-            return const Center(
-              child: Opacity(
-                opacity: 0.2,
-                child: Text("No Msg", style: TextStyle(fontSize: 24)),
-              ),
-            );
+            return const Center(child: Text('No messages found'));
           }
 
           return ListView.builder(
-            padding: const EdgeInsets.all(10),
             itemCount: messages.length,
             itemBuilder: (context, index) {
-              final msgDoc = messages[index];
-              final msg = msgDoc.data() as Map<String, dynamic>;
+              final msg = messages[index].data() as Map<String, dynamic>;
+              final text = msg['text'] ?? '';
+              final senderId = msg['senderId'] ?? '';
+              final postId = msg['orderId'] ?? 'N/A';
+
+              final Timestamp? timestamp = msg['timestamp'];
+              final timeStr =
+                  timestamp != null
+                      ? timestamp.toDate().toLocal().toString().split('.')[0]
+                      : 'Unknown';
 
               return Card(
-                elevation: 4,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                margin: const EdgeInsets.all(10),
                 child: Padding(
-                  padding: const EdgeInsets.all(12.0),
+                  padding: const EdgeInsets.all(12),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Post ID: ${msg['postId'] ?? 'N/A'}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
+                        "Post ID: $postId",
+                        style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 8),
-                      Text(msg['text'] ?? 'No message'),
+                      Text("Message: $text"),
                       const SizedBox(height: 8),
+                      Text("From: $senderId"),
                       Text(
-                        'From Job Provider ID: ${msg['senderId']}',
+                        "At: $timeStr",
                         style: const TextStyle(color: Colors.grey),
                       ),
                       const SizedBox(height: 12),
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
-                          ElevatedButton(
-                            onPressed: () {
-                              _sendResponse(
-                                jobProviderId: msg['senderId'],
-                                postId: msg['postId'],
-                                isInterested: true,
-                                originalDoc: msgDoc.reference,
-                              );
-                            },
+                          ElevatedButton.icon(
+                            onPressed:
+                                () => sendResponseMessage(
+                                  jobProviderId: senderId,
+                                  postId: postId,
+                                  response: "Yes, I am interested",
+                                  senderWorkerId: workerId,
+                                ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20),
-                              ),
                             ),
-                            child: const Text("I’m Interested"),
+                            icon: const Icon(
+                              Icons.thumb_up,
+                              color: Colors.white,
+                            ),
+                            label: const Text(
+                              "I'm Interested",
+                              style: TextStyle(color: Colors.white),
+                            ),
                           ),
-                          const SizedBox(width: 10),
-                          ElevatedButton(
-                            onPressed: () {
-                              _sendResponse(
-                                jobProviderId: msg['senderId'],
-                                postId: msg['postId'],
-                                isInterested: false,
-                                originalDoc: msgDoc.reference,
-                              );
-                            },
+                          ElevatedButton.icon(
+                            onPressed:
+                                () => sendResponseMessage(
+                                  jobProviderId: senderId,
+                                  postId: postId,
+                                  response: "No, I'm not interested",
+                                  senderWorkerId: workerId,
+                                ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.red,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20),
-                              ),
                             ),
-                            child: const Text("I’m Not Interested"),
+                            icon: const Icon(
+                              Icons.thumb_down,
+                              color: Colors.white,
+                            ),
+                            label: const Text(
+                              "Not Interested",
+                              style: TextStyle(color: Colors.white),
+                            ),
                           ),
                         ],
                       ),
@@ -136,49 +165,5 @@ class _ConfirmationMessagesPageState extends State<ConfirmationMessagesPage> {
         },
       ),
     );
-  }
-
-  Future<void> _sendResponse({
-    required String jobProviderId,
-    required String postId,
-    required bool isInterested,
-    required DocumentReference originalDoc,
-  }) async {
-    final user = _auth.currentUser;
-    if (user == null) return;
-
-    final responseText =
-        isInterested ? "Yes, I'm interested" : "No, I'm not interested";
-
-    final messageData = {
-      'text': responseText,
-      'senderId': widget.workerId,
-      'senderName': widget.workerName,
-      'senderType': 'worker',
-      'receiverType': 'job_provider',
-      'timestamp': Timestamp.now(),
-      'isRead': false,
-      'postId': postId,
-    };
-
-    try {
-      // Add message to job provider's inbox
-      await _firestore
-          .collection('messages')
-          .doc('jobprovider_$jobProviderId')
-          .collection('chats')
-          .add(messageData);
-
-      // Mark original message as responded
-      await originalDoc.update({'responded': true});
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Response sent to job provider.')));
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to send response: $e')));
-    }
   }
 }
