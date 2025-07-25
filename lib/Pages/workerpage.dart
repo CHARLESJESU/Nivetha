@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
@@ -12,14 +11,12 @@ import 'package:nivetha123/Pages/workerpagesubfolder/contentviewer.dart';
 import 'package:nivetha123/Pages/workerpagesubfolder/workerjobprovider.dart';
 import 'package:nivetha123/Pages/workerpagesubfolder/workerpost.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
 import '../login/Login.dart';
 import '../screens/user_data.dart';
 import 'Backcontroll.dart';
 import 'job_status_page.dart';
 import 'map_pages.dart';
 import 'profile_details_page.dart';
-import 'worker_message.dart';
 
 class Workerpage extends StatefulWidget {
   final UserData userData;
@@ -92,6 +89,7 @@ class _WorkerpageState extends State<Workerpage> {
 
           final ordersSnapshot =
               await workerDoc.reference.collection('order').get();
+
           for (final orderDoc in ordersSnapshot.docs) {
             final data = orderDoc.data();
             fetchedPosts.add(
@@ -155,63 +153,6 @@ class _WorkerpageState extends State<Workerpage> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text("Failed to load jobs: $e")));
-    }
-  }
-
-  Future<void> _pickImage() async {
-    final picker = ImagePicker();
-    final XFile? image = await showModalBottomSheet<XFile?>(
-      context: context,
-      builder:
-          (context) => SafeArea(
-            child: Wrap(
-              children: [
-                ListTile(
-                  leading: Icon(Icons.camera_alt),
-                  title: Text('Take Photo'),
-                  onTap: () async {
-                    final picked = await picker.pickImage(
-                      source: ImageSource.camera,
-                    );
-                    Navigator.pop(context, picked);
-                  },
-                ),
-                ListTile(
-                  leading: Icon(Icons.photo_library),
-                  title: Text('Choose from Gallery'),
-                  onTap: () async {
-                    final picked = await picker.pickImage(
-                      source: ImageSource.gallery,
-                    );
-                    Navigator.pop(context, picked);
-                  },
-                ),
-              ],
-            ),
-          ),
-    );
-
-    if (image != null) {
-      setState(() {
-        userData.profileImage = image.path;
-      });
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      await prefs.setString('userData', jsonEncode(userData.toJson()));
-      try {
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc('workers')
-            .collection('workers')
-            .doc(userData.userId)
-            .update({'profileImage': image.path});
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Profile image updated successfully')),
-        );
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update profile image: $e')),
-        );
-      }
     }
   }
 
@@ -287,7 +228,6 @@ class _WorkerpageState extends State<Workerpage> {
           .doc(jobProviderUserId);
 
       await jobRef.set({'summa': 1}, SetOptions(merge: true));
-
       await jobRef.collection('posts').doc(postId).set(appliedJobDetails);
 
       setState(() => appliedJobs[postId] = true);
@@ -303,33 +243,82 @@ class _WorkerpageState extends State<Workerpage> {
     }
   }
 
+  Future<void> pickImage() => _pickImage();
+
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final XFile? image = await showModalBottomSheet<XFile?>(
+      context: context,
+      builder:
+          (context) => SafeArea(
+            child: Wrap(
+              children: [
+                ListTile(
+                  leading: Icon(Icons.camera_alt),
+                  title: Text('Take Photo'),
+                  onTap: () async {
+                    final picked = await picker.pickImage(
+                      source: ImageSource.camera,
+                    );
+                    Navigator.pop(context, picked);
+                  },
+                ),
+                ListTile(
+                  leading: Icon(Icons.photo_library),
+                  title: Text('Choose from Gallery'),
+                  onTap: () async {
+                    final picked = await picker.pickImage(
+                      source: ImageSource.gallery,
+                    );
+                    Navigator.pop(context, picked);
+                  },
+                ),
+              ],
+            ),
+          ),
+    );
+
+    if (image != null) {
+      setState(() {
+        userData.profileImage = image.path;
+      });
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      await prefs.setString('userData', jsonEncode(userData.toJson()));
+      try {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc('workers')
+            .collection('workers')
+            .doc(userData.userId)
+            .update({'profileImage': image.path});
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Profile image updated successfully')),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update profile image: $e')),
+        );
+      }
+    }
+  }
+
   Widget _buildMainContent() {
-    switch (_selectedIndex) {
-      case 0:
-        return WorkerContentView(
-          posts: posts,
-          isLoading: isLoading,
-          appliedJobs: appliedJobs,
-          jobProviderDetails: jobProviderDetails,
-          selectedCity: selectedCity,
-          availableCities: availableCities,
-          onCityChanged: (city) => setState(() => selectedCity = city),
-          onApplyForJob: _applyForJob,
-          onRefreshPosts: _loadPosts,
-        );
-      case 1:
-        return JobStatusPage(userData: userData);
-      case 2:
-        return MessageWorkerPage(
-          workerId: userData.userId,
-          workerName: userData.name,
-          jobProviderId:
-              '', // You might want to pass actual job provider ID if needed
-          jobProviderName:
-              '', // You might want to pass actual job provider name if needed
-        );
-      default:
-        return Container();
+    if (_selectedIndex == 0) {
+      return WorkerContentView(
+        posts: posts,
+        isLoading: isLoading,
+        appliedJobs: appliedJobs,
+        jobProviderDetails: jobProviderDetails,
+        selectedCity: selectedCity,
+        availableCities: availableCities,
+        onCityChanged: (city) => setState(() => selectedCity = city),
+        onApplyForJob: _applyForJob,
+        onRefreshPosts: _loadPosts,
+      );
+    } else if (_selectedIndex == 1) {
+      return JobStatusPage(userData: userData);
+    } else {
+      return const Center(child: Text("Messages will appear here"));
     }
   }
 
@@ -404,7 +393,7 @@ class _WorkerpageState extends State<Workerpage> {
                   bottom: 0,
                   right: 0,
                   child: GestureDetector(
-                    onTap: _pickImage,
+                    onTap: pickImage,
                     child: Container(
                       decoration: const BoxDecoration(
                         color: Colors.white,
