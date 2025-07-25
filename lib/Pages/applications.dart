@@ -60,8 +60,13 @@ class Application {
 
 class ApplicationsPage extends StatefulWidget {
   final String jobProviderUserId;
+  final String jobProviderName;
 
-  const ApplicationsPage({required this.jobProviderUserId, super.key});
+  const ApplicationsPage({
+    required this.jobProviderUserId,
+    required this.jobProviderName,
+    super.key,
+  });
 
   @override
   _ApplicationsPageState createState() => _ApplicationsPageState();
@@ -72,10 +77,6 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
   List<bool> showOrderDetails = [];
   bool isLoading = true;
   StreamSubscription<DatabaseEvent>? _subscription;
-
-  Set<String> decidedOrders = {};
-  Set<String> confirmedWorkers = {};
-  Map<String, String> confirmedWorkerPerOrder = {};
 
   @override
   void initState() {
@@ -98,8 +99,6 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
                 if (!mounted) return;
 
                 Map<String, List<Application>> tempGroupedApps = {};
-                Map<String, String> tempConfirmed = {};
-
                 for (var postDoc in querySnapshot.docs) {
                   final orderId = postDoc.id;
 
@@ -111,16 +110,7 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
                     final workerUserId = workerDoc.id;
                     final workerData = workerDoc.data();
 
-                    Application app = Application.fromMap(
-                      workerUserId,
-                      workerData,
-                    );
-                    workers.add(app);
-
-                    if (app.status == 'confirmation') {
-                      tempConfirmed[orderId] = workerUserId;
-                      confirmedWorkers.add(workerUserId);
-                    }
+                    workers.add(Application.fromMap(workerUserId, workerData));
                   }
 
                   tempGroupedApps[orderId] = workers;
@@ -128,7 +118,6 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
 
                 setState(() {
                   groupedApplications = tempGroupedApps;
-                  confirmedWorkerPerOrder = tempConfirmed;
                   showOrderDetails = List.generate(
                     tempGroupedApps.length,
                     (_) => false,
@@ -149,20 +138,6 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
             as StreamSubscription<DatabaseEvent>?;
   }
 
-  // ✅ Helper method to send confirmation message to worker
-  Future<void> sendMessageToWorker(String workerUserId, String message) async {
-    final messageRef = FirebaseFirestore.instance
-        .collection('messages')
-        .doc(workerUserId)
-        .collection('inbox');
-
-    await messageRef.add({
-      'message': message,
-      'timestamp': FieldValue.serverTimestamp(),
-      'from': widget.jobProviderUserId,
-    });
-  }
-
   Future<void> updateApplicationStatus(
     String orderId,
     String workerUserId,
@@ -170,6 +145,8 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
   ) async {
     try {
       final firestore = FirebaseFirestore.instance;
+
+      WriteBatch batch = firestore.batch();
 
       final applicationsRef = firestore
           .collection('applications')
@@ -187,31 +164,17 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
           .collection('posts')
           .doc(orderId);
 
-      WriteBatch batch = firestore.batch();
-
       batch.update(applicationsRef, {'status': newStatus});
       batch.update(appliedJobsRef, {'status': newStatus});
 
       await batch.commit();
 
-      if (newStatus == 'rejected' || newStatus == 'accepted') {
+      if (newStatus == 'rejected') {
         setState(() {
           groupedApplications[orderId]!
               .firstWhere((app) => app.userId == workerUserId)
               .showDetails = false;
-          decidedOrders.add(orderId);
         });
-      } else if (newStatus == 'confirmation') {
-        setState(() {
-          confirmedWorkers.add(workerUserId);
-          confirmedWorkerPerOrder[orderId] = workerUserId;
-        });
-
-        // ✅ Send confirmation message
-        await sendMessageToWorker(
-          workerUserId,
-          'You have been marked for confirmation for job Order ID: $orderId.',
-        );
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -226,6 +189,57 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
     }
   }
 
+  Future<void> sendConfirmationMessage(
+    String workerUserId,
+    String orderId,
+  ) async {
+    try {
+      final firestore = FirebaseFirestore.instance;
+      const defaultMessage = "Are you still interested in this job?";
+
+      // Save message to worker's chat
+      await firestore
+          .collection('messages')
+          .doc('worker_$workerUserId')
+          .collection('chats')
+          .add({
+            'text': defaultMessage,
+            'senderId': widget.jobProviderUserId,
+            'senderName': widget.jobProviderName,
+            'senderType': 'job_provider',
+            'receiverType': 'worker',
+            'timestamp': Timestamp.now(),
+            'orderId': orderId,
+            'isRead': false,
+          });
+
+      // Also save to job provider's collection for their reference
+      await firestore
+          .collection('messages')
+          .doc('jobprovider_${widget.jobProviderUserId}')
+          .collection('chats')
+          .add({
+            'text': defaultMessage,
+            'senderId': widget.jobProviderUserId,
+            'senderName': widget.jobProviderName,
+            'senderType': 'job_provider',
+            'receiverType': 'worker',
+            'timestamp': Timestamp.now(),
+            'orderId': orderId,
+            'isRead': true,
+            'workerId': workerUserId,
+          });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Confirmation message sent to worker')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to send message: $e')));
+    }
+  }
+
   Color getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'applied':
@@ -234,8 +248,6 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
         return Colors.green;
       case 'rejected':
         return Colors.red;
-      case 'confirmation':
-        return Colors.orange;
       default:
         return Colors.grey;
     }
@@ -294,14 +306,6 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
   ) {
     bool showDetails = worker.showDetails;
     String status = worker.status;
-
-    bool isDecided = decidedOrders.contains(orderId);
-    bool isConfirmed = confirmedWorkers.contains(worker.userId);
-
-    bool anotherConfirmed =
-        confirmedWorkerPerOrder[orderId] != null &&
-        confirmedWorkerPerOrder[orderId] != worker.userId;
-
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: Card(
@@ -384,7 +388,7 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
                           Expanded(
                             child: ElevatedButton(
                               onPressed:
-                                  (status == 'applied' && !isDecided)
+                                  status == 'applied'
                                       ? () => updateApplicationStatus(
                                         orderId,
                                         worker.userId,
@@ -403,11 +407,11 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
                               ),
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 8),
                           Expanded(
                             child: ElevatedButton(
                               onPressed:
-                                  (status == 'applied' && !isDecided)
+                                  status == 'applied'
                                       ? () => updateApplicationStatus(
                                         orderId,
                                         worker.userId,
@@ -426,20 +430,14 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
                               ),
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 8),
                           Expanded(
                             child: ElevatedButton(
                               onPressed:
-                                  (status == 'applied' &&
-                                          !isConfirmed &&
-                                          !anotherConfirmed &&
-                                          !isDecided)
-                                      ? () => updateApplicationStatus(
-                                        orderId,
-                                        worker.userId,
-                                        'confirmation',
-                                      )
-                                      : null,
+                                  () => sendConfirmationMessage(
+                                    worker.userId,
+                                    orderId,
+                                  ),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.orange,
                                 shape: RoundedRectangleBorder(
@@ -447,12 +445,8 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
                                 ),
                               ),
                               child: const Text(
-                                'Confirmation',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 6,
-                                ),
+                                'Confirm',
+                                style: TextStyle(color: Colors.white),
                               ),
                             ),
                           ),
