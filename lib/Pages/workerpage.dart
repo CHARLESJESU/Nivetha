@@ -1,40 +1,24 @@
 import 'dart:convert';
-
 import 'dart:io';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
-
 import 'package:flutter/material.dart';
-
 import 'package:geocoding/geocoding.dart';
-
 import 'package:get/get.dart';
-
 import 'package:image_picker/image_picker.dart';
-
-import 'package:firebase_database/firebase_database.dart';
-
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:nivetha123/Pages/workerpagesubfolder/contentviewer.dart';
-
-import 'package:nivetha123/Pages/workerpagesubfolder/workerjobprovider.dart';
-
-import 'package:nivetha123/Pages/workerpagesubfolder/workerpost.dart';
-
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:nivetha123/Pages/workerpagesubfolder/contentviewer.dart';
+import 'package:nivetha123/Pages/workerpagesubfolder/workerjobprovider.dart';
+import 'package:nivetha123/Pages/workerpagesubfolder/workerpost.dart';
+
 import '../login/Login.dart';
-
 import '../screens/user_data.dart';
-
 import 'Backcontroll.dart';
-
 import 'job_status_page.dart';
-
 import 'map_pages.dart';
-
 import 'profile_details_page.dart';
-
+import 'worker_message.dart'; // ✅ Add this
 
 class Workerpage extends StatefulWidget {
   final UserData userData;
@@ -48,7 +32,6 @@ class _WorkerpageState extends State<Workerpage> {
   late UserData userData;
   int _selectedIndex = 0;
 
-  // These will be passed to WorkerContentView or managed centrally if more complex
   List<Post> posts = [];
   bool isLoading = true;
   Map<String, bool> appliedJobs = {};
@@ -56,14 +39,13 @@ class _WorkerpageState extends State<Workerpage> {
   String? selectedCity;
   List<String> availableCities = [];
 
-
   @override
   void initState() {
     super.initState();
     userData = widget.userData;
     _initializePreferences();
     _loadAppliedJobs();
-    _loadPosts(); // This will load data for both tabs
+    _loadPosts();
   }
 
   void _initializePreferences() async {
@@ -90,9 +72,8 @@ class _WorkerpageState extends State<Workerpage> {
     }
   }
 
-
   Future<void> _loadPosts() async {
-    setState(() => isLoading = true); // Set loading true at the start
+    setState(() => isLoading = true);
     try {
       final workersRef = FirebaseFirestore.instance
           .collection('jobs')
@@ -108,9 +89,9 @@ class _WorkerpageState extends State<Workerpage> {
         try {
           final userId = workerDoc.id;
 
-          final ordersSnapshot = await workerDoc.reference
-              .collection('order')
-              .get();
+          final ordersSnapshot =
+              await workerDoc.reference.collection('order').get();
+
           for (final orderDoc in ordersSnapshot.docs) {
             final data = orderDoc.data();
             fetchedPosts.add(
@@ -124,12 +105,13 @@ class _WorkerpageState extends State<Workerpage> {
             );
           }
 
-          final providerSnapshot = await FirebaseFirestore.instance
-              .collection('users')
-              .doc('jobproviders')
-              .collection('jobproviders')
-              .doc(userId)
-              .get();
+          final providerSnapshot =
+              await FirebaseFirestore.instance
+                  .collection('users')
+                  .doc('jobproviders')
+                  .collection('jobproviders')
+                  .doc(userId)
+                  .get();
 
           if (providerSnapshot.exists) {
             final data = providerSnapshot.data()!;
@@ -155,7 +137,7 @@ class _WorkerpageState extends State<Workerpage> {
           }
         } catch (e) {
           print("Error processing workerDoc ${workerDoc.id}: $e");
-          continue; // Skip to next workerDoc
+          continue;
         }
       }
 
@@ -170,12 +152,11 @@ class _WorkerpageState extends State<Workerpage> {
     } catch (e) {
       print("Failed to load posts or providers: $e");
       setState(() => isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed to load jobs: $e")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Failed to load jobs: $e")));
     }
   }
-
 
   Future<void> _pickImage() async {
     final picker = ImagePicker();
@@ -183,31 +164,31 @@ class _WorkerpageState extends State<Workerpage> {
       context: context,
       builder:
           (context) => SafeArea(
-        child: Wrap(
-          children: [
-            ListTile(
-              leading: Icon(Icons.camera_alt),
-              title: Text('Take Photo'),
-              onTap: () async {
-                final picked = await picker.pickImage(
-                  source: ImageSource.camera,
-                );
-                Navigator.pop(context, picked);
-              },
+            child: Wrap(
+              children: [
+                ListTile(
+                  leading: Icon(Icons.camera_alt),
+                  title: Text('Take Photo'),
+                  onTap: () async {
+                    final picked = await picker.pickImage(
+                      source: ImageSource.camera,
+                    );
+                    Navigator.pop(context, picked);
+                  },
+                ),
+                ListTile(
+                  leading: Icon(Icons.photo_library),
+                  title: Text('Choose from Gallery'),
+                  onTap: () async {
+                    final picked = await picker.pickImage(
+                      source: ImageSource.gallery,
+                    );
+                    Navigator.pop(context, picked);
+                  },
+                ),
+              ],
             ),
-            ListTile(
-              leading: Icon(Icons.photo_library),
-              title: Text('Choose from Gallery'),
-              onTap: () async {
-                final picked = await picker.pickImage(
-                  source: ImageSource.gallery,
-                );
-                Navigator.pop(context, picked);
-              },
-            ),
-          ],
-        ),
-      ),
+          ),
     );
 
     if (image != null) {
@@ -263,15 +244,15 @@ class _WorkerpageState extends State<Workerpage> {
       };
 
       final post = posts.firstWhere(
-            (p) => p.postId == postId && p.userId == jobProviderUserId,
+        (p) => p.postId == postId && p.userId == jobProviderUserId,
         orElse:
             () => Post(
-          userId: '',
-          postId: '',
-          orderId: '',
-          description: '',
-          imageBase64: '',
-        ),
+              userId: '',
+              postId: '',
+              orderId: '',
+              description: '',
+              imageBase64: '',
+            ),
       );
 
       if (post.postId.isEmpty || post.userId.isEmpty) {
@@ -288,12 +269,7 @@ class _WorkerpageState extends State<Workerpage> {
           .doc(postId);
 
       await postRef.set({'active': true}, SetOptions(merge: true));
-
-      await postRef
-          .collection('workers')
-          .doc(workerUserId)
-          .set(workerDetails);
-
+      await postRef.collection('workers').doc(workerUserId).set(workerDetails);
 
       final appliedJobDetails = {
         'orderId': post.orderId,
@@ -310,11 +286,7 @@ class _WorkerpageState extends State<Workerpage> {
           .doc(jobProviderUserId);
 
       await jobRef.set({'summa': 1}, SetOptions(merge: true));
-
-      await jobRef
-          .collection('posts')
-          .doc(postId)
-          .set(appliedJobDetails);
+      await jobRef.collection('posts').doc(postId).set(appliedJobDetails);
 
       setState(() => appliedJobs[postId] = true);
       await _saveAppliedJob(postId);
@@ -340,13 +312,14 @@ class _WorkerpageState extends State<Workerpage> {
         availableCities: availableCities,
         onCityChanged: (city) => setState(() => selectedCity = city),
         onApplyForJob: _applyForJob,
-        onRefreshPosts: _loadPosts, // Pass the refresh function down
+        onRefreshPosts: _loadPosts,
       );
-    } else {
+    } else if (_selectedIndex == 1) {
       return JobStatusPage(userData: userData);
+    } else {
+      return WorkerMessagesPage(workerId: userData.userId);
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -359,12 +332,12 @@ class _WorkerpageState extends State<Workerpage> {
         key: scaffoldKey,
         appBar: AppBar(
           title: Text(
-            _selectedIndex == 0 ? 'Welcome, ${userData.name}' : 'Job Status',
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-              fontSize: 25,
-            ),
+            _selectedIndex == 0
+                ? 'Welcome, ${userData.name}'
+                : _selectedIndex == 1
+                ? 'Job Status'
+                : 'Messages',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 25),
           ),
           backgroundColor: Colors.blueAccent,
           leading: IconButton(
@@ -374,7 +347,7 @@ class _WorkerpageState extends State<Workerpage> {
         ),
         drawer: buildDrawer(),
         body: RefreshIndicator(
-          onRefresh:_loadPosts,
+          onRefresh: _loadPosts,
           child: _buildMainContent(),
         ),
         bottomNavigationBar: BottomNavigationBar(
@@ -386,6 +359,10 @@ class _WorkerpageState extends State<Workerpage> {
             BottomNavigationBarItem(
               icon: Icon(Icons.assignment),
               label: 'Job Status',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.message),
+              label: 'Messages',
             ),
           ],
         ),
@@ -399,10 +376,7 @@ class _WorkerpageState extends State<Workerpage> {
         padding: EdgeInsets.zero,
         children: [
           UserAccountsDrawerHeader(
-            accountName: Text(
-              userData.name,
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
+            accountName: Text(userData.name),
             accountEmail: Text(userData.userId),
             currentAccountPicture: Stack(
               children: [
@@ -413,11 +387,11 @@ class _WorkerpageState extends State<Workerpage> {
                   child: GestureDetector(
                     onTap: _pickImage,
                     child: Container(
+                      padding: const EdgeInsets.all(3),
                       decoration: const BoxDecoration(
                         color: Colors.white,
                         shape: BoxShape.circle,
                       ),
-                      padding: const EdgeInsets.all(3), // Add padding for the icon
                       child: const Icon(
                         Icons.edit,
                         size: 24,
@@ -465,7 +439,7 @@ class _WorkerpageState extends State<Workerpage> {
               if (shouldLogout == true) {
                 SharedPreferences prefs = await SharedPreferences.getInstance();
                 await prefs.setBool('isLoggedIn', false);
-                await prefs.remove('userData'); // Clear user data on logout
+                await prefs.remove('userData');
                 Get.offAll(() => LoginScreen());
               }
             },

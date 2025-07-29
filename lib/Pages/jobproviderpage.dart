@@ -128,7 +128,7 @@ class _JobproviderpageState extends State<Jobproviderpage> {
       case 1:
         return ApplicationsPage(jobProviderUserId: userData.userId);
       case 2:
-        return MessagesPage();
+        return MessagesPage(jobProviderId: userData.userId);
       default:
         return OrderDetailsPage(userId: widget.userData.userId);
     }
