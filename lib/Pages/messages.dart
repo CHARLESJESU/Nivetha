@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class MessagesPage extends StatefulWidget {
+  final String jobProviderId; // Pass job provider ID here
+
+  const MessagesPage({super.key, required this.jobProviderId});
+
   @override
   _MessagesPageState createState() => _MessagesPageState();
 }
@@ -20,10 +24,13 @@ class _MessagesPageState extends State<MessagesPage> {
     setState(() => isLoading = true);
 
     try {
-      // Fetch only 'worker_response' type messages
       final snapshot =
           await FirebaseFirestore.instance
-              .collectionGroup('inbox')
+              .collection('messages')
+              .doc(
+                widget.jobProviderId,
+              ) // 🔥 Only fetch from this provider's inbox
+              .collection('inbox')
               .orderBy('timestamp', descending: true)
               .get();
 
