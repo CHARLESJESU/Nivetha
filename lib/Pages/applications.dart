@@ -1,6 +1,8 @@
+// Your original imports
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_database/firebase_database.dart';
 
 class Application {
   final String userId;
@@ -59,13 +61,8 @@ class Application {
 
 class ApplicationsPage extends StatefulWidget {
   final String jobProviderUserId;
-  final String jobProviderName;
 
-  const ApplicationsPage({
-    required this.jobProviderUserId,
-    required this.jobProviderName,
-    super.key,
-  });
+  const ApplicationsPage({required this.jobProviderUserId, super.key});
 
   @override
   _ApplicationsPageState createState() => _ApplicationsPageState();
@@ -74,8 +71,9 @@ class ApplicationsPage extends StatefulWidget {
 class _ApplicationsPageState extends State<ApplicationsPage> {
   Map<String, List<Application>> groupedApplications = {};
   List<bool> showOrderDetails = [];
+  Map<String, bool> confirmSent = {}; // new: track confirm state
   bool isLoading = true;
-  StreamSubscription? _subscription;
+  StreamSubscription<DatabaseEvent>? _subscription;
 
   @override
   void initState() {
@@ -92,47 +90,59 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
         .collection('posts');
 
     _subscription?.cancel();
-    _subscription = ref.snapshots().listen((querySnapshot) async {
-      if (!mounted) return;
+    _subscription =
+        ref.snapshots().listen(
+              (querySnapshot) async {
+                if (!mounted) return;
 
-      Map<String, List<Application>> tempGroupedApps = {};
-      for (var postDoc in querySnapshot.docs) {
-        final orderId = postDoc.id;
-        final workersSnapshot =
-        await postDoc.reference.collection('workers').get();
-        List<Application> workers = [];
+                Map<String, List<Application>> tempGroupedApps = {};
 
-        for (var workerDoc in workersSnapshot.docs) {
-          final workerUserId = workerDoc.id;
-          final workerData = workerDoc.data();
-          workers.add(Application.fromMap(workerUserId, workerData));
-        }
+                for (var postDoc in querySnapshot.docs) {
+                  final orderId = postDoc.id;
+                  final workersSnapshot =
+                      await postDoc.reference.collection('workers').get();
+                  List<Application> workers = [];
 
-        tempGroupedApps[orderId] = workers;
-      }
+                  for (var workerDoc in workersSnapshot.docs) {
+                    final workerUserId = workerDoc.id;
+                    final workerData = workerDoc.data();
 
-      setState(() {
-        groupedApplications = tempGroupedApps;
-        showOrderDetails = List.generate(tempGroupedApps.length, (_) => false);
-        isLoading = false;
-      });
-    }, onError: (error) {
-      if (!mounted) return;
-      setState(() => isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load applications: $error')),
-      );
-    });
+                    workers.add(Application.fromMap(workerUserId, workerData));
+                  }
+
+                  tempGroupedApps[orderId] = workers;
+                }
+
+                setState(() {
+                  groupedApplications = tempGroupedApps;
+                  showOrderDetails = List.generate(
+                    tempGroupedApps.length,
+                    (_) => false,
+                  );
+                  confirmSent = {}; // reset confirm state
+                  isLoading = false;
+                });
+              },
+              onError: (error) {
+                if (!mounted) return;
+                setState(() => isLoading = false);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Failed to load applications: $error'),
+                  ),
+                );
+              },
+            )
+            as StreamSubscription<DatabaseEvent>?;
   }
 
   Future<void> updateApplicationStatus(
-      String orderId,
-      String workerUserId,
-      String newStatus,
-      ) async {
+    String orderId,
+    String workerUserId,
+    String newStatus,
+  ) async {
     try {
       final firestore = FirebaseFirestore.instance;
-      WriteBatch batch = firestore.batch();
 
       final applicationsRef = firestore
           .collection('applications')
@@ -149,6 +159,8 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
           .doc(widget.jobProviderUserId)
           .collection('posts')
           .doc(orderId);
+
+      WriteBatch batch = firestore.batch();
 
       batch.update(applicationsRef, {'status': newStatus});
       batch.update(appliedJobsRef, {'status': newStatus});
@@ -167,57 +179,44 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
         SnackBar(content: Text('Application $newStatus successfully')),
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to update status: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to update status: $e')));
     }
   }
 
-  Future<void> sendConfirmationMessage(
-      String workerUserId,
-      String orderId,
-      ) async {
+  Future<void> sendConfirmMessagesToAll(String orderId) async {
+    if (confirmSent[orderId] == true) return;
+
+    final workers = groupedApplications[orderId] ?? [];
+    final firestore = FirebaseFirestore.instance;
+
     try {
-      final firestore = FirebaseFirestore.instance;
-      const defaultMessage = "Are you still interested in this job?";
+      for (var worker in workers) {
+        final inboxRef = firestore
+            .collection('messages')
+            .doc(worker.userId)
+            .collection('inbox');
 
-      await firestore
-          .collection('messages')
-          .doc('worker_$workerUserId')
-          .collection('chats')
-          .add({
-        'text': defaultMessage,
-        'senderId': widget.jobProviderUserId,
-        'senderName': widget.jobProviderName,
-        'senderType': 'job_provider',
-        'receiverType': 'worker',
-        'timestamp': Timestamp.now(),
-        'orderId': orderId,
-        'isRead': false,
-      });
+        await inboxRef.add({
+          'from': widget.jobProviderUserId,
+          'postId': orderId,
+          'message': 'You are allowed to apply for this job.',
+          'type': 'job_confirmation',
+          'timestamp': FieldValue.serverTimestamp(),
+        });
+      }
 
-      await firestore
-          .collection('messages')
-          .doc('jobprovider_${widget.jobProviderUserId}')
-          .collection('chats')
-          .add({
-        'text': defaultMessage,
-        'senderId': widget.jobProviderUserId,
-        'senderName': widget.jobProviderName,
-        'senderType': 'job_provider',
-        'receiverType': 'worker',
-        'timestamp': Timestamp.now(),
-        'orderId': orderId,
-        'isRead': true,
-        'workerId': workerUserId,
+      setState(() {
+        confirmSent[orderId] = true;
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Confirmation message sent to worker')),
+        const SnackBar(content: Text('Confirmation sent to all workers.')),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to send message: $e')),
+        SnackBar(content: Text('Failed to send confirmation: $e')),
       );
     }
   }
@@ -230,14 +229,78 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
         return Colors.green;
       case 'rejected':
         return Colors.red;
-      case 'confirmed':
-        return Colors.orange;
       default:
         return Colors.grey;
     }
   }
 
-  Widget _buildWorkerCard(Application worker, int orderIndex, int workerIndex, String orderId) {
+  Widget _buildOrderCard(
+    String orderId,
+    List<Application> workers,
+    int orderIndex,
+  ) {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ExpansionTile(
+        title: Text(
+          'Order ID: $orderId',
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Colors.blueAccent,
+          ),
+        ),
+        subtitle: Text(
+          '${workers.length} Applicant${workers.length == 1 ? '' : 's'}',
+          style: const TextStyle(fontSize: 14, color: Colors.grey),
+        ),
+        initiallyExpanded: showOrderDetails[orderIndex],
+        onExpansionChanged: (expanded) {
+          setState(() {
+            showOrderDetails[orderIndex] = expanded;
+          });
+        },
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: ElevatedButton.icon(
+              onPressed:
+                  confirmSent[orderId] == true
+                      ? null
+                      : () => sendConfirmMessagesToAll(orderId),
+              icon: const Icon(Icons.check_circle),
+              label: Text(
+                confirmSent[orderId] == true
+                    ? 'Confirmation Sent'
+                    : 'Confirm & Notify All Workers',
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor:
+                    confirmSent[orderId] == true ? Colors.grey : Colors.indigo,
+              ),
+            ),
+          ),
+          ...workers.asMap().entries.map((entry) {
+            return _buildWorkerCard(
+              entry.value,
+              orderIndex,
+              entry.key,
+              orderId,
+            );
+          }).toList(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWorkerCard(
+    Application worker,
+    int orderIndex,
+    int workerIndex,
+    String orderId,
+  ) {
     bool showDetails = worker.showDetails;
     String status = worker.status;
     return Padding(
@@ -257,9 +320,27 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(worker.name, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                        Text('User ID: ${worker.userId}', style: const TextStyle(fontSize: 13, color: Colors.grey)),
-                        Text('Status: ${worker.status}', style: TextStyle(fontSize: 13, color: getStatusColor(worker.status))),
+                        Text(
+                          worker.name,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          'User ID: ${worker.userId}',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey,
+                          ),
+                        ),
+                        Text(
+                          'Status: ${worker.status}',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: getStatusColor(worker.status),
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -268,11 +349,15 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
                       showDetails ? Icons.expand_less : Icons.expand_more,
                       color: status == 'rejected' ? Colors.grey : Colors.blue,
                     ),
-                    onPressed: status == 'rejected' ? null : () {
-                      setState(() {
-                        groupedApplications[orderId]![workerIndex].showDetails = !showDetails;
-                      });
-                    },
+                    onPressed:
+                        status == 'rejected'
+                            ? null
+                            : () {
+                              setState(() {
+                                groupedApplications[orderId]![workerIndex]
+                                    .showDetails = !showDetails;
+                              });
+                            },
                   ),
                 ],
               ),
@@ -295,38 +380,38 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
                       _detailText('Address', worker.address),
                       const SizedBox(height: 8),
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Expanded(
                             child: ElevatedButton(
-                              onPressed: status == 'applied'
-                                  ? () => updateApplicationStatus(orderId, worker.userId, 'accepted')
-                                  : null,
-                              style: ElevatedButton.styleFrom(backgroundColor: Colors.green, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-                              child: const Text('Accept', style: TextStyle(color: Colors.white)),
+                              onPressed:
+                                  status == 'applied'
+                                      ? () => updateApplicationStatus(
+                                        orderId,
+                                        worker.userId,
+                                        'accepted',
+                                      )
+                                      : null,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                              ),
+                              child: const Text('Accept'),
                             ),
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 12),
                           Expanded(
                             child: ElevatedButton(
-                              onPressed: status == 'applied'
-                                  ? () => updateApplicationStatus(orderId, worker.userId, 'rejected')
-                                  : null,
-                              style: ElevatedButton.styleFrom(backgroundColor: Colors.red, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-                              child: const Text('Reject', style: TextStyle(color: Colors.white)),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: status == 'applied'
-                                  ? () async {
-                                await updateApplicationStatus(orderId, worker.userId, 'confirmed');
-                                await sendConfirmationMessage(worker.userId, orderId);
-                              }
-                                  : null,
-                              style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-                              child: const Text('Confirm', style: TextStyle(color: Colors.white)),
+                              onPressed:
+                                  status == 'applied'
+                                      ? () => updateApplicationStatus(
+                                        orderId,
+                                        worker.userId,
+                                        'rejected',
+                                      )
+                                      : null,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                              ),
+                              child: const Text('Reject'),
                             ),
                           ),
                         ],
@@ -349,10 +434,20 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
         children: [
           SizedBox(
             width: 100,
-            child: Text('$label:', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.black87)),
+            child: Text(
+              '$label:',
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: Colors.black87,
+              ),
+            ),
           ),
           Expanded(
-            child: Text(value, style: TextStyle(fontSize: 13, color: color ?? Colors.black87)),
+            child: Text(
+              value,
+              style: TextStyle(fontSize: 13, color: color ?? Colors.black87),
+            ),
           ),
         ],
       ),
@@ -373,42 +468,36 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
           isLoading
               ? const Center(child: CircularProgressIndicator())
               : RefreshIndicator(
-            onRefresh: fetchApplications,
-            child: groupedApplications.isEmpty
-                ? ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              children: const [
-                SizedBox(height: 150),
-                Center(child: Icon(Icons.work_off, size: 50, color: Colors.grey)),
-                SizedBox(height: 10),
-                Center(child: Text('No applications yet')),
-              ],
-            )
-                : ListView.builder(
-              physics: const AlwaysScrollableScrollPhysics(),
-              itemCount: groupedApplications.length,
-              itemBuilder: (context, index) {
-                String orderId = groupedApplications.keys.elementAt(index);
-                final workers = groupedApplications[orderId] ?? [];
-                return Card(
-                  margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  elevation: 4,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  child: ExpansionTile(
-                    title: Text('Order ID: $orderId', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blueAccent)),
-                    subtitle: Text('${workers.length} Applicant${workers.length == 1 ? '' : 's'}', style: const TextStyle(fontSize: 14, color: Colors.grey)),
-                    initiallyExpanded: showOrderDetails[index],
-                    onExpansionChanged: (expanded) {
-                      setState(() {
-                        showOrderDetails[index] = expanded;
-                      });
-                    },
-                    children: workers.asMap().entries.map((entry) => _buildWorkerCard(entry.value, index, entry.key, orderId)).toList(),
-                  ),
-                );
-              },
-            ),
-          ),
+                onRefresh: fetchApplications,
+                child:
+                    groupedApplications.isEmpty
+                        ? ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: const [
+                            SizedBox(height: 150),
+                            Center(
+                              child: Icon(
+                                Icons.work_off,
+                                size: 50,
+                                color: Colors.grey,
+                              ),
+                            ),
+                            SizedBox(height: 10),
+                            Center(child: Text('No applications yet')),
+                          ],
+                        )
+                        : ListView.builder(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          itemCount: groupedApplications.length,
+                          itemBuilder: (context, index) {
+                            String orderId = groupedApplications.keys.elementAt(
+                              index,
+                            );
+                            final workers = groupedApplications[orderId] ?? [];
+                            return _buildOrderCard(orderId, workers, index);
+                          },
+                        ),
+              ),
         ],
       ),
     );

@@ -5,18 +5,20 @@ import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 import 'package:nivetha123/Pages/workerpagesubfolder/contentviewer.dart';
 import 'package:nivetha123/Pages/workerpagesubfolder/workerjobprovider.dart';
 import 'package:nivetha123/Pages/workerpagesubfolder/workerpost.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+
 import '../login/Login.dart';
 import '../screens/user_data.dart';
 import 'Backcontroll.dart';
 import 'job_status_page.dart';
 import 'map_pages.dart';
 import 'profile_details_page.dart';
+import 'worker_message.dart'; // ✅ Add this
 
 class Workerpage extends StatefulWidget {
   final UserData userData;
@@ -156,95 +158,6 @@ class _WorkerpageState extends State<Workerpage> {
     }
   }
 
-  Future<void> _applyForJob(String jobProviderUserId, String postId) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please log in to apply for jobs")),
-      );
-      return;
-    }
-
-    try {
-      final workerUserId = userData.userId;
-
-      final workerDetails = {
-        'workerUserId': workerUserId,
-        'name': userData.name,
-        'phoneNumber': userData.phoneNumber,
-        'experience': userData.experience ?? 'Not provided',
-        'role': userData.role,
-        'gender': userData.gender,
-        'dob': userData.dob?.toLocal().toString().split(' ')[0] ?? 'Not Set',
-        'country': userData.country,
-        'state': userData.state,
-        'district': userData.district,
-        'city': userData.city,
-        'area': userData.area,
-        'address': userData.address,
-      };
-
-      final post = posts.firstWhere(
-        (p) => p.postId == postId && p.userId == jobProviderUserId,
-        orElse:
-            () => Post(
-              userId: '',
-              postId: '',
-              orderId: '',
-              description: '',
-              imageBase64: '',
-            ),
-      );
-
-      if (post.postId.isEmpty || post.userId.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Post not found or invalid")),
-        );
-        return;
-      }
-
-      final postRef = FirebaseFirestore.instance
-          .collection('applications')
-          .doc(jobProviderUserId)
-          .collection('posts')
-          .doc(postId);
-
-      await postRef.set({'active': true}, SetOptions(merge: true));
-
-      await postRef.collection('workers').doc(workerUserId).set(workerDetails);
-
-      final appliedJobDetails = {
-        'orderId': post.orderId,
-        'description': post.description,
-        'imageBase64': post.imageBase64,
-        'status': 'applied',
-        'appliedAt': DateTime.now().toIso8601String(),
-      };
-
-      final jobRef = FirebaseFirestore.instance
-          .collection('appliedJobs')
-          .doc(workerUserId)
-          .collection('jobProviders')
-          .doc(jobProviderUserId);
-
-      await jobRef.set({'summa': 1}, SetOptions(merge: true));
-      await jobRef.collection('posts').doc(postId).set(appliedJobDetails);
-
-      setState(() => appliedJobs[postId] = true);
-      await _saveAppliedJob(postId);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Successfully applied to the job!")),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Failed to apply to the job: $e")));
-    }
-  }
-
-  Future<void> pickImage() => _pickImage();
-
   Future<void> _pickImage() async {
     final picker = ImagePicker();
     final XFile? image = await showModalBottomSheet<XFile?>(
@@ -302,6 +215,92 @@ class _WorkerpageState extends State<Workerpage> {
     }
   }
 
+  Future<void> _applyForJob(String jobProviderUserId, String postId) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please log in to apply for jobs")),
+      );
+      return;
+    }
+
+    try {
+      final workerUserId = userData.userId;
+
+      final workerDetails = {
+        'workerUserId': workerUserId,
+        'name': userData.name,
+        'phoneNumber': userData.phoneNumber,
+        'experience': userData.experience ?? 'Not provided',
+        'role': userData.role,
+        'gender': userData.gender,
+        'dob': userData.dob?.toLocal().toString().split(' ')[0] ?? 'Not Set',
+        'country': userData.country,
+        'state': userData.state,
+        'district': userData.district,
+        'city': userData.city,
+        'area': userData.area,
+        'address': userData.address,
+      };
+
+      final post = posts.firstWhere(
+        (p) => p.postId == postId && p.userId == jobProviderUserId,
+        orElse:
+            () => Post(
+              userId: '',
+              postId: '',
+              orderId: '',
+              description: '',
+              imageBase64: '',
+            ),
+      );
+
+      if (post.postId.isEmpty || post.userId.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Post not found or invalid")),
+        );
+        return;
+      }
+
+      final postRef = FirebaseFirestore.instance
+          .collection('applications')
+          .doc(jobProviderUserId)
+          .collection('posts')
+          .doc(postId);
+
+      await postRef.set({'active': true}, SetOptions(merge: true));
+      await postRef.collection('workers').doc(workerUserId).set(workerDetails);
+
+      final appliedJobDetails = {
+        'orderId': post.orderId,
+        'description': post.description,
+        'imageBase64': post.imageBase64,
+        'status': 'applied',
+        'appliedAt': DateTime.now().toIso8601String(),
+      };
+
+      final jobRef = FirebaseFirestore.instance
+          .collection('appliedJobs')
+          .doc(workerUserId)
+          .collection('jobProviders')
+          .doc(jobProviderUserId);
+
+      await jobRef.set({'summa': 1}, SetOptions(merge: true));
+      await jobRef.collection('posts').doc(postId).set(appliedJobDetails);
+
+      setState(() => appliedJobs[postId] = true);
+      await _saveAppliedJob(postId);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Successfully applied to the job!")),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Failed to apply to the job: $e")));
+    }
+  }
+
   Widget _buildMainContent() {
     if (_selectedIndex == 0) {
       return WorkerContentView(
@@ -318,7 +317,7 @@ class _WorkerpageState extends State<Workerpage> {
     } else if (_selectedIndex == 1) {
       return JobStatusPage(userData: userData);
     } else {
-      return const Center(child: Text("Messages will appear here"));
+      return WorkerMessagesPage(workerId: userData.userId);
     }
   }
 
@@ -338,11 +337,7 @@ class _WorkerpageState extends State<Workerpage> {
                 : _selectedIndex == 1
                 ? 'Job Status'
                 : 'Messages',
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-              fontSize: 25,
-            ),
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 25),
           ),
           backgroundColor: Colors.blueAccent,
           leading: IconButton(
@@ -381,10 +376,7 @@ class _WorkerpageState extends State<Workerpage> {
         padding: EdgeInsets.zero,
         children: [
           UserAccountsDrawerHeader(
-            accountName: Text(
-              userData.name,
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
+            accountName: Text(userData.name),
             accountEmail: Text(userData.userId),
             currentAccountPicture: Stack(
               children: [
@@ -393,13 +385,13 @@ class _WorkerpageState extends State<Workerpage> {
                   bottom: 0,
                   right: 0,
                   child: GestureDetector(
-                    onTap: pickImage,
+                    onTap: _pickImage,
                     child: Container(
+                      padding: const EdgeInsets.all(3),
                       decoration: const BoxDecoration(
                         color: Colors.white,
                         shape: BoxShape.circle,
                       ),
-                      padding: const EdgeInsets.all(3),
                       child: const Icon(
                         Icons.edit,
                         size: 24,
