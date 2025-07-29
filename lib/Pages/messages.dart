@@ -20,10 +20,10 @@ class _MessagesPageState extends State<MessagesPage> {
     setState(() => isLoading = true);
 
     try {
-      // Fetch all messages from Firestore
+      // Fetch only 'worker_response' type messages
       final snapshot =
           await FirebaseFirestore.instance
-              .collectionGroup('inbox') // Fetches from all users' inboxes
+              .collectionGroup('inbox')
               .orderBy('timestamp', descending: true)
               .get();
 
@@ -31,12 +31,14 @@ class _MessagesPageState extends State<MessagesPage> {
 
       for (var doc in snapshot.docs) {
         final data = doc.data();
-        fetchedMessages.add({
-          'workerId': doc.reference.parent.parent?.id ?? 'Unknown',
-          'postId': data['postId'] ?? 'Unknown',
-          'message': data['message'] ?? 'No message',
-          'timestamp': data['timestamp'],
-        });
+        if (data['type'] == 'worker_response') {
+          fetchedMessages.add({
+            'workerId': data['from'] ?? 'Unknown',
+            'postId': data['postId'] ?? 'Unknown',
+            'message': data['message'] ?? 'No message',
+            'timestamp': data['timestamp'],
+          });
+        }
       }
 
       setState(() {
