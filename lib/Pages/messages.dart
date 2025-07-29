@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class MessagesPage extends StatefulWidget {
   @override
@@ -6,32 +7,109 @@ class MessagesPage extends StatefulWidget {
 }
 
 class _MessagesPageState extends State<MessagesPage> {
+  List<Map<String, dynamic>> messages = [];
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    fetchMessages();
+  }
+
+  Future<void> fetchMessages() async {
+    setState(() => isLoading = true);
+
+    try {
+      // Fetch all messages from Firestore
+      final snapshot =
+          await FirebaseFirestore.instance
+              .collectionGroup('inbox') // Fetches from all users' inboxes
+              .orderBy('timestamp', descending: true)
+              .get();
+
+      final List<Map<String, dynamic>> fetchedMessages = [];
+
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        fetchedMessages.add({
+          'workerId': doc.reference.parent.parent?.id ?? 'Unknown',
+          'postId': data['postId'] ?? 'Unknown',
+          'message': data['message'] ?? 'No message',
+          'timestamp': data['timestamp'],
+        });
+      }
+
+      setState(() {
+        messages = fetchedMessages;
+        isLoading = false;
+      });
+    } catch (e) {
+      print('Error fetching messages: $e');
+      setState(() => isLoading = false);
+    }
+  }
+
   Future<void> _refresh() async {
-    await Future.delayed(Duration(seconds: 1));
+    await fetchMessages();
   }
 
   @override
   Widget build(BuildContext context) {
     return RefreshIndicator(
       onRefresh: _refresh,
-      child: ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        children: [
-          SizedBox(
-            height: MediaQuery.of(context).size.height,
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: const [
-                  Text('Messages Page', style: TextStyle(fontSize: 12)),
-                  SizedBox(height: 8),
-                  Icon(Icons.mail_outline, size: 48, color: Colors.black54),
+      child:
+          isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : messages.isEmpty
+              ? ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  SizedBox(height: MediaQuery.of(context).size.height * 0.4),
+                  const Center(
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.mail_outline,
+                          size: 48,
+                          color: Colors.black54,
+                        ),
+                        SizedBox(height: 8),
+                        Text('No messages yet', style: TextStyle(fontSize: 14)),
+                      ],
+                    ),
+                  ),
                 ],
+              )
+              : ListView.builder(
+                physics: const AlwaysScrollableScrollPhysics(),
+                itemCount: messages.length,
+                itemBuilder: (context, index) {
+                  final msg = messages[index];
+                  return ListTile(
+                    leading: const Icon(Icons.message, color: Colors.blue),
+                    title: Text(msg['message']),
+                    subtitle: Text(
+                      'Worker ID: ${msg['workerId']} • Post ID: ${msg['postId']}',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    trailing:
+                        msg['timestamp'] != null
+                            ? Text(
+                              _formatTimestamp(msg['timestamp']),
+                              style: const TextStyle(
+                                color: Colors.grey,
+                                fontSize: 11,
+                              ),
+                            )
+                            : null,
+                  );
+                },
               ),
-            ),
-          ),
-        ],
-      ),
     );
+  }
+
+  String _formatTimestamp(Timestamp timestamp) {
+    final dateTime = timestamp.toDate();
+    return '${dateTime.year}/${dateTime.month}/${dateTime.day} ${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
   }
 }
