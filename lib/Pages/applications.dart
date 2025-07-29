@@ -1,8 +1,6 @@
-// Your original imports
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:firebase_database/firebase_database.dart';
 
 class Application {
   final String userId;
@@ -71,9 +69,8 @@ class ApplicationsPage extends StatefulWidget {
 class _ApplicationsPageState extends State<ApplicationsPage> {
   Map<String, List<Application>> groupedApplications = {};
   List<bool> showOrderDetails = [];
-  Map<String, bool> confirmSent = {}; // new: track confirm state
   bool isLoading = true;
-  StreamSubscription<DatabaseEvent>? _subscription;
+  StreamSubscription? _subscription;
 
   @override
   void initState() {
@@ -90,50 +87,45 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
         .collection('posts');
 
     _subscription?.cancel();
-    _subscription =
-        ref.snapshots().listen(
-              (querySnapshot) async {
-                if (!mounted) return;
+    _subscription = ref.snapshots().listen(
+      (querySnapshot) async {
+        if (!mounted) return;
 
-                Map<String, List<Application>> tempGroupedApps = {};
+        Map<String, List<Application>> tempGroupedApps = {};
 
-                for (var postDoc in querySnapshot.docs) {
-                  final orderId = postDoc.id;
-                  final workersSnapshot =
-                      await postDoc.reference.collection('workers').get();
-                  List<Application> workers = [];
+        for (var postDoc in querySnapshot.docs) {
+          final orderId = postDoc.id;
+          final workersSnapshot =
+              await postDoc.reference.collection('workers').get();
+          List<Application> workers = [];
 
-                  for (var workerDoc in workersSnapshot.docs) {
-                    final workerUserId = workerDoc.id;
-                    final workerData = workerDoc.data();
+          for (var workerDoc in workersSnapshot.docs) {
+            final workerUserId = workerDoc.id;
+            final workerData = workerDoc.data();
 
-                    workers.add(Application.fromMap(workerUserId, workerData));
-                  }
+            workers.add(Application.fromMap(workerUserId, workerData));
+          }
 
-                  tempGroupedApps[orderId] = workers;
-                }
+          tempGroupedApps[orderId] = workers;
+        }
 
-                setState(() {
-                  groupedApplications = tempGroupedApps;
-                  showOrderDetails = List.generate(
-                    tempGroupedApps.length,
-                    (_) => false,
-                  );
-                  confirmSent = {}; // reset confirm state
-                  isLoading = false;
-                });
-              },
-              onError: (error) {
-                if (!mounted) return;
-                setState(() => isLoading = false);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Failed to load applications: $error'),
-                  ),
-                );
-              },
-            )
-            as StreamSubscription<DatabaseEvent>?;
+        setState(() {
+          groupedApplications = tempGroupedApps;
+          showOrderDetails = List.generate(
+            tempGroupedApps.length,
+            (_) => false,
+          );
+          isLoading = false;
+        });
+      },
+      onError: (error) {
+        if (!mounted) return;
+        setState(() => isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load applications: $error')),
+        );
+      },
+    );
   }
 
   Future<void> updateApplicationStatus(
@@ -185,34 +177,28 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
     }
   }
 
-  Future<void> sendConfirmMessagesToAll(String orderId) async {
-    if (confirmSent[orderId] == true) return;
-
-    final workers = groupedApplications[orderId] ?? [];
+  Future<void> sendIndividualConfirmation(
+    String workerUserId,
+    String postId,
+  ) async {
     final firestore = FirebaseFirestore.instance;
 
     try {
-      for (var worker in workers) {
-        final inboxRef = firestore
-            .collection('messages')
-            .doc(worker.userId)
-            .collection('inbox');
+      final inboxRef = firestore
+          .collection('messages')
+          .doc(workerUserId)
+          .collection('inbox');
 
-        await inboxRef.add({
-          'from': widget.jobProviderUserId,
-          'postId': orderId,
-          'message': 'You are allowed to apply for this job.',
-          'type': 'job_confirmation',
-          'timestamp': FieldValue.serverTimestamp(),
-        });
-      }
-
-      setState(() {
-        confirmSent[orderId] = true;
+      await inboxRef.add({
+        'from': widget.jobProviderUserId,
+        'postId': postId,
+        'message': 'You are allowed to apply for this job.',
+        'type': 'job_confirmation',
+        'timestamp': FieldValue.serverTimestamp(),
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Confirmation sent to all workers.')),
+        const SnackBar(content: Text('Confirmation sent to worker.')),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -262,35 +248,15 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
             showOrderDetails[orderIndex] = expanded;
           });
         },
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: ElevatedButton.icon(
-              onPressed:
-                  confirmSent[orderId] == true
-                      ? null
-                      : () => sendConfirmMessagesToAll(orderId),
-              icon: const Icon(Icons.check_circle),
-              label: Text(
-                confirmSent[orderId] == true
-                    ? 'Confirmation Sent'
-                    : 'Confirm & Notify All Workers',
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor:
-                    confirmSent[orderId] == true ? Colors.grey : Colors.indigo,
-              ),
-            ),
-          ),
-          ...workers.asMap().entries.map((entry) {
-            return _buildWorkerCard(
-              entry.value,
-              orderIndex,
-              entry.key,
-              orderId,
-            );
-          }).toList(),
-        ],
+        children:
+            workers.asMap().entries.map((entry) {
+              return _buildWorkerCard(
+                entry.value,
+                orderIndex,
+                entry.key,
+                orderId,
+              );
+            }).toList(),
       ),
     );
   }
@@ -397,7 +363,7 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
                               child: const Text('Accept'),
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 8),
                           Expanded(
                             child: ElevatedButton(
                               onPressed:
@@ -412,6 +378,20 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
                                 backgroundColor: Colors.red,
                               ),
                               child: const Text('Reject'),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed:
+                                  () => sendIndividualConfirmation(
+                                    worker.userId,
+                                    orderId,
+                                  ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.orange,
+                              ),
+                              child: const Text('Confirmation'),
                             ),
                           ),
                         ],
