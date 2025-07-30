@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-
-import 'worker_chatpage.dart';
+import 'package:nivetha123/Pages/worker_chatpage.dart';
 
 class WorkerMessagesPage extends StatefulWidget {
   final String workerId;
@@ -13,7 +12,8 @@ class WorkerMessagesPage extends StatefulWidget {
 }
 
 class _WorkerMessagesPageState extends State<WorkerMessagesPage> {
-  final Set<String> _sentInterest = {};
+  final Set<String> _sentInterest = {}; // Tracks post IDs already responded to
+  final Set<String> _notInterestedSent = {};
 
   @override
   Widget build(BuildContext context) {
@@ -48,6 +48,9 @@ class _WorkerMessagesPageState extends State<WorkerMessagesPage> {
               final type = data['type'] ?? 'general';
               final key = '$from-$postId';
 
+              final hasSentInterested = _sentInterest.contains(key);
+              final hasSentNotInterested = _notInterestedSent.contains(key);
+
               return Card(
                 margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 child: Padding(
@@ -72,32 +75,42 @@ class _WorkerMessagesPageState extends State<WorkerMessagesPage> {
                           children: [
                             Expanded(
                               child: ElevatedButton.icon(
-                                onPressed: () async {
-                                  final alreadySent = await _checkIfAlreadySent(
-                                    jobProviderId: from,
-                                    postId: postId,
-                                  );
+                                onPressed:
+                                    hasSentInterested
+                                        ? null
+                                        : () async {
+                                          final alreadySent =
+                                              await _checkIfAlreadySent(
+                                                jobProviderId: from,
+                                                postId: postId,
+                                              );
 
-                                  if (alreadySent) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          'You have already sent your interest.',
-                                        ),
-                                      ),
-                                    );
-                                    _navigateToChat(postId, from);
-                                    return;
-                                  }
+                                          if (alreadySent) {
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                  'You have already sent your interest.',
+                                                ),
+                                              ),
+                                            );
+                                            _navigateToChat(postId, from);
+                                            return;
+                                          }
 
-                                  await _sendResponseToJobProvider(
-                                    jobProviderId: from,
-                                    workerResponse: 'interested',
-                                    postId: postId,
-                                  );
+                                          await _sendResponseToJobProvider(
+                                            jobProviderId: from,
+                                            workerResponse: 'interested',
+                                            postId: postId,
+                                          );
 
-                                  _navigateToChat(postId, from);
-                                },
+                                          setState(() {
+                                            _sentInterest.add(key);
+                                          });
+
+                                          _navigateToChat(postId, from);
+                                        },
                                 icon: const Icon(Icons.thumb_up),
                                 label: const Text("I'm interested"),
                                 style: ElevatedButton.styleFrom(
@@ -108,13 +121,20 @@ class _WorkerMessagesPageState extends State<WorkerMessagesPage> {
                             const SizedBox(width: 12),
                             Expanded(
                               child: ElevatedButton.icon(
-                                onPressed: () {
-                                  _sendResponseToJobProvider(
-                                    jobProviderId: from,
-                                    workerResponse: 'not_interested',
-                                    postId: postId,
-                                  );
-                                },
+                                onPressed:
+                                    hasSentNotInterested
+                                        ? null
+                                        : () async {
+                                          await _sendResponseToJobProvider(
+                                            jobProviderId: from,
+                                            workerResponse: 'not_interested',
+                                            postId: postId,
+                                          );
+
+                                          setState(() {
+                                            _notInterestedSent.add(key);
+                                          });
+                                        },
                                 icon: const Icon(Icons.thumb_down),
                                 label: const Text("Not interested"),
                                 style: ElevatedButton.styleFrom(
