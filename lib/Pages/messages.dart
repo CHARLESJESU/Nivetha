@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'jobprovider_chatpage.dart';
+
 class MessagesPage extends StatefulWidget {
   final String jobProviderId;
 
@@ -65,7 +67,6 @@ class _MessagesPageState extends State<MessagesPage> {
   }) async {
     final timestamp = FieldValue.serverTimestamp();
 
-    // Save message to worker's inbox for notification (optional)
     await FirebaseFirestore.instance
         .collection('messages')
         .doc(workerId)
@@ -79,7 +80,6 @@ class _MessagesPageState extends State<MessagesPage> {
           'status': 'sent',
         });
 
-    // Save to chat collection for real-time chat
     final chatRef = FirebaseFirestore.instance
         .collection('chats')
         .doc(postId)
@@ -104,6 +104,21 @@ class _MessagesPageState extends State<MessagesPage> {
   String _formatTimestamp(Timestamp timestamp) {
     final dateTime = timestamp.toDate();
     return '${dateTime.year}/${dateTime.month}/${dateTime.day} ${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
+  }
+
+  void _openChatPage(String workerId, String postId) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder:
+            (_) => ChatPage(
+              // 👈 Added
+              workerId: workerId,
+              jobProviderId: widget.jobProviderId,
+              postId: postId,
+            ),
+      ),
+    );
   }
 
   @override
@@ -151,139 +166,147 @@ class _MessagesPageState extends State<MessagesPage> {
                       horizontal: 12,
                       vertical: 8,
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(msg['message']),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Worker ID: $workerId • Post ID: $postId',
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                          if (msg['timestamp'] != null)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 4),
-                              child: Text(
-                                _formatTimestamp(msg['timestamp']),
-                                style: const TextStyle(
-                                  color: Colors.grey,
-                                  fontSize: 11,
+                    child: InkWell(
+                      // 👈 Added to make tapable
+                      onTap:
+                          response == 'interested'
+                              ? () => _openChatPage(workerId, postId)
+                              : null,
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(msg['message']),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Worker ID: $workerId • Post ID: $postId',
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                            if (msg['timestamp'] != null)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(
+                                  _formatTimestamp(msg['timestamp']),
+                                  style: const TextStyle(
+                                    color: Colors.grey,
+                                    fontSize: 11,
+                                  ),
                                 ),
                               ),
-                            ),
 
-                          if (response == 'interested') ...[
-                            const Divider(height: 16),
-                            TextField(
-                              controller: controller,
-                              decoration: InputDecoration(
-                                labelText: 'Send a message to worker',
-                                border: const OutlineInputBorder(),
-                                suffixIcon: IconButton(
-                                  icon: const Icon(Icons.send),
-                                  onPressed: () {
-                                    final text = controller.text.trim();
-                                    if (text.isNotEmpty) {
-                                      _sendMessageToWorker(
-                                        workerId: workerId,
-                                        postId: postId,
-                                        text: text,
-                                      );
-                                      controller.clear();
-                                    }
-                                  },
+                            if (response == 'interested') ...[
+                              const Divider(height: 16),
+                              TextField(
+                                controller: controller,
+                                decoration: InputDecoration(
+                                  labelText: 'Send a message to worker',
+                                  border: const OutlineInputBorder(),
+                                  suffixIcon: IconButton(
+                                    icon: const Icon(Icons.send),
+                                    onPressed: () {
+                                      final text = controller.text.trim();
+                                      if (text.isNotEmpty) {
+                                        _sendMessageToWorker(
+                                          workerId: workerId,
+                                          postId: postId,
+                                          text: text,
+                                        );
+                                        controller.clear();
+                                      }
+                                    },
+                                  ),
                                 ),
                               ),
-                            ),
-                            const SizedBox(height: 12),
-                            StreamBuilder<QuerySnapshot>(
-                              stream:
-                                  FirebaseFirestore.instance
-                                      .collection('chats')
-                                      .doc(postId)
-                                      .collection('messages')
-                                      .orderBy('timestamp')
-                                      .snapshots(),
-                              builder: (context, snapshot) {
-                                if (snapshot.connectionState ==
-                                    ConnectionState.waiting) {
-                                  return const Center(
-                                    child: CircularProgressIndicator(),
-                                  );
-                                }
+                              const SizedBox(height: 12),
+                              StreamBuilder<QuerySnapshot>(
+                                stream:
+                                    FirebaseFirestore.instance
+                                        .collection('chats')
+                                        .doc(postId)
+                                        .collection('messages')
+                                        .orderBy('timestamp')
+                                        .snapshots(),
+                                builder: (context, snapshot) {
+                                  if (snapshot.connectionState ==
+                                      ConnectionState.waiting) {
+                                    return const Center(
+                                      child: CircularProgressIndicator(),
+                                    );
+                                  }
 
-                                final chatDocs = snapshot.data?.docs ?? [];
+                                  final chatDocs = snapshot.data?.docs ?? [];
 
-                                return ListView.builder(
-                                  shrinkWrap: true,
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  itemCount: chatDocs.length,
-                                  itemBuilder: (context, index) {
-                                    final chat =
-                                        chatDocs[index].data()
-                                            as Map<String, dynamic>;
-                                    final isMe =
-                                        chat['from'] == widget.jobProviderId;
-                                    final msgText = chat['message'] ?? '';
-                                    final time =
-                                        chat['timestamp'] != null
-                                            ? _formatTimestamp(
-                                              chat['timestamp'],
-                                            )
-                                            : '';
+                                  return ListView.builder(
+                                    shrinkWrap: true,
+                                    physics:
+                                        const NeverScrollableScrollPhysics(),
+                                    itemCount: chatDocs.length,
+                                    itemBuilder: (context, index) {
+                                      final chat =
+                                          chatDocs[index].data()
+                                              as Map<String, dynamic>;
+                                      final isMe =
+                                          chat['from'] == widget.jobProviderId;
+                                      final msgText = chat['message'] ?? '';
+                                      final time =
+                                          chat['timestamp'] != null
+                                              ? _formatTimestamp(
+                                                chat['timestamp'],
+                                              )
+                                              : '';
 
-                                    return Align(
-                                      alignment:
-                                          isMe
-                                              ? Alignment.centerRight
-                                              : Alignment.centerLeft,
-                                      child: Container(
-                                        margin: const EdgeInsets.symmetric(
-                                          vertical: 4,
-                                        ),
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 12,
-                                          vertical: 8,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color:
-                                              isMe
-                                                  ? Colors.green[100]
-                                                  : Colors.grey[300],
-                                          borderRadius: BorderRadius.circular(
-                                            12,
+                                      return Align(
+                                        alignment:
+                                            isMe
+                                                ? Alignment.centerRight
+                                                : Alignment.centerLeft,
+                                        child: Container(
+                                          margin: const EdgeInsets.symmetric(
+                                            vertical: 4,
+                                          ),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 8,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color:
+                                                isMe
+                                                    ? Colors.green[100]
+                                                    : Colors.grey[300],
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                          ),
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                msgText,
+                                                style: const TextStyle(
+                                                  fontSize: 14,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                time,
+                                                style: const TextStyle(
+                                                  fontSize: 10,
+                                                  color: Colors.black54,
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ),
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              msgText,
-                                              style: const TextStyle(
-                                                fontSize: 14,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              time,
-                                              style: const TextStyle(
-                                                fontSize: 10,
-                                                color: Colors.black54,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                );
-                              },
-                            ),
+                                      );
+                                    },
+                                  );
+                                },
+                              ),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
                     ),
                   );

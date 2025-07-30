@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'worker_chatpage.dart';
+
 class WorkerMessagesPage extends StatefulWidget {
   final String workerId;
 
@@ -11,8 +13,7 @@ class WorkerMessagesPage extends StatefulWidget {
 }
 
 class _WorkerMessagesPageState extends State<WorkerMessagesPage> {
-  final Map<String, TextEditingController> _chatControllers = {};
-  final Map<String, bool> _showChatBox = {};
+  final Set<String> _sentInterest = {};
 
   @override
   Widget build(BuildContext context) {
@@ -47,9 +48,6 @@ class _WorkerMessagesPageState extends State<WorkerMessagesPage> {
               final type = data['type'] ?? 'general';
               final key = '$from-$postId';
 
-              _chatControllers.putIfAbsent(key, () => TextEditingController());
-              _showChatBox.putIfAbsent(key, () => false);
-
               return Card(
                 margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 child: Padding(
@@ -75,14 +73,30 @@ class _WorkerMessagesPageState extends State<WorkerMessagesPage> {
                             Expanded(
                               child: ElevatedButton.icon(
                                 onPressed: () async {
+                                  final alreadySent = await _checkIfAlreadySent(
+                                    jobProviderId: from,
+                                    postId: postId,
+                                  );
+
+                                  if (alreadySent) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'You have already sent your interest.',
+                                        ),
+                                      ),
+                                    );
+                                    _navigateToChat(postId, from);
+                                    return;
+                                  }
+
                                   await _sendResponseToJobProvider(
                                     jobProviderId: from,
                                     workerResponse: 'interested',
                                     postId: postId,
                                   );
-                                  setState(() {
-                                    _showChatBox[key] = true;
-                                  });
+
+                                  _navigateToChat(postId, from);
                                 },
                                 icon: const Icon(Icons.thumb_up),
                                 label: const Text("I'm interested"),
@@ -94,15 +108,12 @@ class _WorkerMessagesPageState extends State<WorkerMessagesPage> {
                             const SizedBox(width: 12),
                             Expanded(
                               child: ElevatedButton.icon(
-                                onPressed: () async {
-                                  await _sendResponseToJobProvider(
+                                onPressed: () {
+                                  _sendResponseToJobProvider(
                                     jobProviderId: from,
                                     workerResponse: 'not_interested',
                                     postId: postId,
                                   );
-                                  setState(() {
-                                    _showChatBox[key] = false;
-                                  });
                                 },
                                 icon: const Icon(Icons.thumb_down),
                                 label: const Text("Not interested"),
@@ -112,106 +123,6 @@ class _WorkerMessagesPageState extends State<WorkerMessagesPage> {
                               ),
                             ),
                           ],
-                        ),
-                      ],
-                      if (_showChatBox[key] == true) ...[
-                        const Divider(height: 20),
-                        TextField(
-                          controller: _chatControllers[key],
-                          decoration: InputDecoration(
-                            labelText: 'Type your message',
-                            border: const OutlineInputBorder(),
-                            suffixIcon: IconButton(
-                              icon: const Icon(Icons.send),
-                              onPressed: () {
-                                final text = _chatControllers[key]!.text.trim();
-                                if (text.isNotEmpty) {
-                                  _sendChatMessage(
-                                    postId: postId,
-                                    to: from,
-                                    message: text,
-                                  );
-                                  _chatControllers[key]!.clear();
-                                }
-                              },
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        StreamBuilder<QuerySnapshot>(
-                          stream:
-                              FirebaseFirestore.instance
-                                  .collection('chats')
-                                  .doc(postId)
-                                  .collection('messages')
-                                  .orderBy('timestamp')
-                                  .snapshots(),
-                          builder: (context, chatSnapshot) {
-                            if (chatSnapshot.connectionState ==
-                                ConnectionState.waiting) {
-                              return const Center(
-                                child: CircularProgressIndicator(),
-                              );
-                            }
-
-                            final chatDocs = chatSnapshot.data?.docs ?? [];
-
-                            return ListView.builder(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              itemCount: chatDocs.length,
-                              itemBuilder: (context, index) {
-                                final chat =
-                                    chatDocs[index].data()
-                                        as Map<String, dynamic>;
-                                final isMe = chat['from'] == widget.workerId;
-                                final msg = chat['message'] ?? '';
-                                final timestamp = chat['timestamp'];
-                                final time =
-                                    timestamp != null
-                                        ? _formatTimestamp(timestamp)
-                                        : '';
-
-                                return Align(
-                                  alignment:
-                                      isMe
-                                          ? Alignment.centerRight
-                                          : Alignment.centerLeft,
-                                  child: Container(
-                                    margin: const EdgeInsets.symmetric(
-                                      vertical: 4,
-                                    ),
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 8,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color:
-                                          isMe
-                                              ? Colors.blue[100]
-                                              : Colors.grey[300],
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(msg),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          time,
-                                          style: const TextStyle(
-                                            fontSize: 10,
-                                            color: Colors.black54,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              },
-                            );
-                          },
                         ),
                       ],
                     ],
@@ -257,25 +168,30 @@ class _WorkerMessagesPageState extends State<WorkerMessagesPage> {
     );
   }
 
-  Future<void> _sendChatMessage({
+  Future<bool> _checkIfAlreadySent({
+    required String jobProviderId,
     required String postId,
-    required String to,
-    required String message,
   }) async {
-    await FirebaseFirestore.instance
-        .collection('chats')
-        .doc(postId)
-        .collection('messages')
-        .add({
-          'from': widget.workerId,
-          'to': to,
-          'message': message,
-          'timestamp': FieldValue.serverTimestamp(),
-        });
+    final snapshot =
+        await FirebaseFirestore.instance
+            .collection('messages')
+            .doc(jobProviderId)
+            .collection('inbox')
+            .where('from', isEqualTo: widget.workerId)
+            .where('postId', isEqualTo: postId)
+            .where('response', isEqualTo: 'interested')
+            .get();
+
+    return snapshot.docs.isNotEmpty;
   }
 
-  String _formatTimestamp(Timestamp timestamp) {
-    final dt = timestamp.toDate();
-    return '${dt.year}/${dt.month}/${dt.day} ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}';
+  void _navigateToChat(String postId, String to) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder:
+            (_) => ChatPage(postId: postId, myId: widget.workerId, peerId: to),
+      ),
+    );
   }
 }
