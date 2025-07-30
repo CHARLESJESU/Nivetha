@@ -63,33 +63,47 @@ class _MessagesPageState extends State<MessagesPage> {
     required String postId,
     required String text,
   }) async {
-    final ref = FirebaseFirestore.instance
+    final timestamp = FieldValue.serverTimestamp();
+
+    // Save message to worker's inbox for notification (optional)
+    await FirebaseFirestore.instance
         .collection('messages')
         .doc(workerId)
-        .collection('inbox');
+        .collection('inbox')
+        .add({
+          'from': widget.jobProviderId,
+          'type': 'job_provider_message',
+          'postId': postId,
+          'message': text,
+          'timestamp': timestamp,
+          'status': 'sent',
+        });
 
-    try {
-      await ref.add({
-        'from': widget.jobProviderId,
-        'type': 'job_provider_message',
-        'postId': postId,
-        'message': text,
-        'timestamp': FieldValue.serverTimestamp(),
-        'status': 'sent',
-      });
+    // Save to chat collection for real-time chat
+    final chatRef = FirebaseFirestore.instance
+        .collection('chats')
+        .doc(postId)
+        .collection('messages');
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Message sent to worker')));
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to send message: $e')));
-    }
+    await chatRef.add({
+      'from': widget.jobProviderId,
+      'to': workerId,
+      'message': text,
+      'timestamp': timestamp,
+    });
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Message sent to worker')));
   }
 
   Future<void> _refresh() async {
     await fetchMessages();
+  }
+
+  String _formatTimestamp(Timestamp timestamp) {
+    final dateTime = timestamp.toDate();
+    return '${dateTime.year}/${dateTime.month}/${dateTime.day} ${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
   }
 
   @override
@@ -159,13 +173,14 @@ class _MessagesPageState extends State<MessagesPage> {
                                 ),
                               ),
                             ),
+
                           if (response == 'interested') ...[
                             const Divider(height: 16),
                             TextField(
                               controller: controller,
                               decoration: InputDecoration(
                                 labelText: 'Send a message to worker',
-                                border: OutlineInputBorder(),
+                                border: const OutlineInputBorder(),
                                 suffixIcon: IconButton(
                                   icon: const Icon(Icons.send),
                                   onPressed: () {
@@ -182,6 +197,91 @@ class _MessagesPageState extends State<MessagesPage> {
                                 ),
                               ),
                             ),
+                            const SizedBox(height: 12),
+                            StreamBuilder<QuerySnapshot>(
+                              stream:
+                                  FirebaseFirestore.instance
+                                      .collection('chats')
+                                      .doc(postId)
+                                      .collection('messages')
+                                      .orderBy('timestamp')
+                                      .snapshots(),
+                              builder: (context, snapshot) {
+                                if (snapshot.connectionState ==
+                                    ConnectionState.waiting) {
+                                  return const Center(
+                                    child: CircularProgressIndicator(),
+                                  );
+                                }
+
+                                final chatDocs = snapshot.data?.docs ?? [];
+
+                                return ListView.builder(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  itemCount: chatDocs.length,
+                                  itemBuilder: (context, index) {
+                                    final chat =
+                                        chatDocs[index].data()
+                                            as Map<String, dynamic>;
+                                    final isMe =
+                                        chat['from'] == widget.jobProviderId;
+                                    final msgText = chat['message'] ?? '';
+                                    final time =
+                                        chat['timestamp'] != null
+                                            ? _formatTimestamp(
+                                              chat['timestamp'],
+                                            )
+                                            : '';
+
+                                    return Align(
+                                      alignment:
+                                          isMe
+                                              ? Alignment.centerRight
+                                              : Alignment.centerLeft,
+                                      child: Container(
+                                        margin: const EdgeInsets.symmetric(
+                                          vertical: 4,
+                                        ),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 8,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color:
+                                              isMe
+                                                  ? Colors.green[100]
+                                                  : Colors.grey[300],
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              msgText,
+                                              style: const TextStyle(
+                                                fontSize: 14,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              time,
+                                              style: const TextStyle(
+                                                fontSize: 10,
+                                                color: Colors.black54,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                );
+                              },
+                            ),
                           ],
                         ],
                       ),
@@ -190,10 +290,5 @@ class _MessagesPageState extends State<MessagesPage> {
                 },
               ),
     );
-  }
-
-  String _formatTimestamp(Timestamp timestamp) {
-    final dateTime = timestamp.toDate();
-    return '${dateTime.year}/${dateTime.month}/${dateTime.day} ${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
   }
 }
