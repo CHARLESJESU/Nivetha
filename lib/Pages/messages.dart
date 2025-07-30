@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-
 import 'jobprovider_chatpage.dart';
 
 class MessagesPage extends StatefulWidget {
@@ -25,7 +24,6 @@ class _MessagesPageState extends State<MessagesPage> {
 
   Future<void> fetchMessages() async {
     setState(() => isLoading = true);
-
     try {
       final snapshot =
           await FirebaseFirestore.instance
@@ -36,7 +34,6 @@ class _MessagesPageState extends State<MessagesPage> {
               .get();
 
       final List<Map<String, dynamic>> fetchedMessages = [];
-
       for (var doc in snapshot.docs) {
         final data = doc.data();
         if (data['type'] == 'worker_response') {
@@ -80,17 +77,16 @@ class _MessagesPageState extends State<MessagesPage> {
           'status': 'sent',
         });
 
-    final chatRef = FirebaseFirestore.instance
+    await FirebaseFirestore.instance
         .collection('chats')
         .doc(postId)
-        .collection('messages');
-
-    await chatRef.add({
-      'from': widget.jobProviderId,
-      'to': workerId,
-      'message': text,
-      'timestamp': timestamp,
-    });
+        .collection('messages')
+        .add({
+          'from': widget.jobProviderId,
+          'to': workerId,
+          'message': text,
+          'timestamp': timestamp,
+        });
 
     ScaffoldMessenger.of(
       context,
@@ -102,8 +98,8 @@ class _MessagesPageState extends State<MessagesPage> {
   }
 
   String _formatTimestamp(Timestamp timestamp) {
-    final dateTime = timestamp.toDate();
-    return '${dateTime.year}/${dateTime.month}/${dateTime.day} ${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
+    final dt = timestamp.toDate();
+    return '${dt.day}/${dt.month}/${dt.year} • ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}';
   }
 
   void _openChatPage(String workerId, String postId) {
@@ -112,7 +108,6 @@ class _MessagesPageState extends State<MessagesPage> {
       MaterialPageRoute(
         builder:
             (_) => ChatPage(
-              // 👈 Added
               workerId: workerId,
               jobProviderId: widget.jobProviderId,
               postId: postId,
@@ -166,22 +161,32 @@ class _MessagesPageState extends State<MessagesPage> {
                       horizontal: 12,
                       vertical: 8,
                     ),
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     child: InkWell(
-                      // 👈 Added to make tapable
                       onTap:
                           response == 'interested'
                               ? () => _openChatPage(workerId, postId)
                               : null,
+                      borderRadius: BorderRadius.circular(12),
                       child: Padding(
-                        padding: const EdgeInsets.all(12),
+                        padding: const EdgeInsets.all(14),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(msg['message']),
+                            Text(
+                              msg['message'],
+                              style: const TextStyle(fontSize: 15),
+                            ),
                             const SizedBox(height: 8),
                             Text(
                               'Worker ID: $workerId • Post ID: $postId',
-                              style: const TextStyle(fontSize: 12),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.black87,
+                              ),
                             ),
                             if (msg['timestamp'] != null)
                               Padding(
@@ -189,19 +194,22 @@ class _MessagesPageState extends State<MessagesPage> {
                                 child: Text(
                                   _formatTimestamp(msg['timestamp']),
                                   style: const TextStyle(
-                                    color: Colors.grey,
                                     fontSize: 11,
+                                    color: Colors.black54,
                                   ),
                                 ),
                               ),
-
                             if (response == 'interested') ...[
-                              const Divider(height: 16),
+                              const Divider(height: 20),
                               TextField(
                                 controller: controller,
                                 decoration: InputDecoration(
                                   labelText: 'Send a message to worker',
-                                  border: const OutlineInputBorder(),
+                                  filled: true,
+                                  fillColor: Colors.grey[100],
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
                                   suffixIcon: IconButton(
                                     icon: const Icon(Icons.send),
                                     onPressed: () {
@@ -230,8 +238,13 @@ class _MessagesPageState extends State<MessagesPage> {
                                 builder: (context, snapshot) {
                                   if (snapshot.connectionState ==
                                       ConnectionState.waiting) {
-                                    return const Center(
-                                      child: CircularProgressIndicator(),
+                                    return const Padding(
+                                      padding: EdgeInsets.symmetric(
+                                        vertical: 12,
+                                      ),
+                                      child: Center(
+                                        child: CircularProgressIndicator(),
+                                      ),
                                     );
                                   }
 
@@ -266,16 +279,27 @@ class _MessagesPageState extends State<MessagesPage> {
                                             vertical: 4,
                                           ),
                                           padding: const EdgeInsets.symmetric(
-                                            horizontal: 12,
-                                            vertical: 8,
+                                            horizontal: 14,
+                                            vertical: 10,
                                           ),
                                           decoration: BoxDecoration(
                                             color:
                                                 isMe
                                                     ? Colors.green[100]
                                                     : Colors.grey[300],
-                                            borderRadius: BorderRadius.circular(
-                                              12,
+                                            borderRadius: BorderRadius.only(
+                                              topLeft: const Radius.circular(
+                                                14,
+                                              ),
+                                              topRight: const Radius.circular(
+                                                14,
+                                              ),
+                                              bottomLeft: Radius.circular(
+                                                isMe ? 14 : 0,
+                                              ),
+                                              bottomRight: Radius.circular(
+                                                isMe ? 0 : 14,
+                                              ),
                                             ),
                                           ),
                                           child: Column(

@@ -12,7 +12,7 @@ class WorkerMessagesPage extends StatefulWidget {
 }
 
 class _WorkerMessagesPageState extends State<WorkerMessagesPage> {
-  final Set<String> _sentInterest = {}; // Tracks post IDs already responded to
+  final Set<String> _sentInterest = {};
   final Set<String> _notInterestedSent = {};
 
   @override
@@ -70,13 +70,14 @@ class _WorkerMessagesPageState extends State<WorkerMessagesPage> {
                       const SizedBox(height: 8),
                       Text(message),
                       const SizedBox(height: 12),
+
                       if (type == 'job_confirmation') ...[
                         Row(
                           children: [
                             Expanded(
                               child: ElevatedButton.icon(
                                 onPressed:
-                                    hasSentInterested
+                                    (hasSentInterested || hasSentNotInterested)
                                         ? null
                                         : () async {
                                           final alreadySent =
@@ -122,7 +123,7 @@ class _WorkerMessagesPageState extends State<WorkerMessagesPage> {
                             Expanded(
                               child: ElevatedButton.icon(
                                 onPressed:
-                                    hasSentNotInterested
+                                    (hasSentInterested || hasSentNotInterested)
                                         ? null
                                         : () async {
                                           await _sendResponseToJobProvider(
