@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class MessagesPage extends StatefulWidget {
-  final String jobProviderId; // Pass job provider ID here
+  final String jobProviderId;
 
   const MessagesPage({super.key, required this.jobProviderId});
 
@@ -13,6 +13,7 @@ class MessagesPage extends StatefulWidget {
 class _MessagesPageState extends State<MessagesPage> {
   List<Map<String, dynamic>> messages = [];
   bool isLoading = true;
+  final Map<String, TextEditingController> _chatControllers = {};
 
   @override
   void initState() {
@@ -27,9 +28,7 @@ class _MessagesPageState extends State<MessagesPage> {
       final snapshot =
           await FirebaseFirestore.instance
               .collection('messages')
-              .doc(
-                widget.jobProviderId,
-              ) // 🔥 Only fetch from this provider's inbox
+              .doc(widget.jobProviderId)
               .collection('inbox')
               .orderBy('timestamp', descending: true)
               .get();
@@ -44,6 +43,7 @@ class _MessagesPageState extends State<MessagesPage> {
             'postId': data['postId'] ?? 'Unknown',
             'message': data['message'] ?? 'No message',
             'timestamp': data['timestamp'],
+            'response': data['response'] ?? 'unknown',
           });
         }
       }
@@ -55,6 +55,36 @@ class _MessagesPageState extends State<MessagesPage> {
     } catch (e) {
       print('Error fetching messages: $e');
       setState(() => isLoading = false);
+    }
+  }
+
+  Future<void> _sendMessageToWorker({
+    required String workerId,
+    required String postId,
+    required String text,
+  }) async {
+    final ref = FirebaseFirestore.instance
+        .collection('messages')
+        .doc(workerId)
+        .collection('inbox');
+
+    try {
+      await ref.add({
+        'from': widget.jobProviderId,
+        'type': 'job_provider_message',
+        'postId': postId,
+        'message': text,
+        'timestamp': FieldValue.serverTimestamp(),
+        'status': 'sent',
+      });
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Message sent to worker')));
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to send message: $e')));
     }
   }
 
@@ -94,23 +124,68 @@ class _MessagesPageState extends State<MessagesPage> {
                 itemCount: messages.length,
                 itemBuilder: (context, index) {
                   final msg = messages[index];
-                  return ListTile(
-                    leading: const Icon(Icons.message, color: Colors.blue),
-                    title: Text(msg['message']),
-                    subtitle: Text(
-                      'Worker ID: ${msg['workerId']} • Post ID: ${msg['postId']}',
-                      style: const TextStyle(fontSize: 12),
+                  final workerId = msg['workerId'];
+                  final postId = msg['postId'];
+                  final response = msg['response'];
+                  final controller = _chatControllers.putIfAbsent(
+                    '$workerId-$postId',
+                    () => TextEditingController(),
+                  );
+
+                  return Card(
+                    margin: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
                     ),
-                    trailing:
-                        msg['timestamp'] != null
-                            ? Text(
-                              _formatTimestamp(msg['timestamp']),
-                              style: const TextStyle(
-                                color: Colors.grey,
-                                fontSize: 11,
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(msg['message']),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Worker ID: $workerId • Post ID: $postId',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          if (msg['timestamp'] != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(
+                                _formatTimestamp(msg['timestamp']),
+                                style: const TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 11,
+                                ),
                               ),
-                            )
-                            : null,
+                            ),
+                          if (response == 'interested') ...[
+                            const Divider(height: 16),
+                            TextField(
+                              controller: controller,
+                              decoration: InputDecoration(
+                                labelText: 'Send a message to worker',
+                                border: OutlineInputBorder(),
+                                suffixIcon: IconButton(
+                                  icon: const Icon(Icons.send),
+                                  onPressed: () {
+                                    final text = controller.text.trim();
+                                    if (text.isNotEmpty) {
+                                      _sendMessageToWorker(
+                                        workerId: workerId,
+                                        postId: postId,
+                                        text: text,
+                                      );
+                                      controller.clear();
+                                    }
+                                  },
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
                   );
                 },
               ),

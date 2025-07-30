@@ -11,6 +11,10 @@ class WorkerMessagesPage extends StatefulWidget {
 }
 
 class _WorkerMessagesPageState extends State<WorkerMessagesPage> {
+  String? _activePostIdForChat;
+  String? _activeJobProviderId;
+  final TextEditingController _chatController = TextEditingController();
+
   @override
   Widget build(BuildContext context) {
     final inboxRef = FirebaseFirestore.instance
@@ -67,12 +71,12 @@ class _WorkerMessagesPageState extends State<WorkerMessagesPage> {
                           children: [
                             Expanded(
                               child: ElevatedButton.icon(
-                                onPressed:
-                                    () => _sendResponseToJobProvider(
-                                      jobProviderId: from,
-                                      workerResponse: 'interested',
-                                      postId: postId,
-                                    ),
+                                onPressed: () {
+                                  setState(() {
+                                    _activePostIdForChat = postId;
+                                    _activeJobProviderId = from;
+                                  });
+                                },
                                 icon: const Icon(Icons.thumb_up),
                                 label: const Text("I'm interested"),
                                 style: ElevatedButton.styleFrom(
@@ -98,6 +102,35 @@ class _WorkerMessagesPageState extends State<WorkerMessagesPage> {
                             ),
                           ],
                         ),
+                        if (_activePostIdForChat == postId) ...[
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: _chatController,
+                            decoration: InputDecoration(
+                              labelText: "Send a message to the job provider",
+                              border: OutlineInputBorder(),
+                              suffixIcon: IconButton(
+                                icon: const Icon(Icons.send),
+                                onPressed: () {
+                                  final chatText = _chatController.text.trim();
+                                  if (chatText.isNotEmpty) {
+                                    _sendResponseToJobProvider(
+                                      jobProviderId: _activeJobProviderId!,
+                                      workerResponse: 'interested',
+                                      postId: _activePostIdForChat!,
+                                      additionalMessage: chatText,
+                                    );
+                                    _chatController.clear();
+                                    setState(() {
+                                      _activePostIdForChat = null;
+                                      _activeJobProviderId = null;
+                                    });
+                                  }
+                                },
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ],
                   ),
@@ -114,11 +147,17 @@ class _WorkerMessagesPageState extends State<WorkerMessagesPage> {
     required String jobProviderId,
     required String workerResponse,
     required String postId,
+    String? additionalMessage,
   }) async {
     final responseRef = FirebaseFirestore.instance
         .collection('messages')
         .doc(jobProviderId)
         .collection('inbox');
+
+    final baseMessage =
+        workerResponse == 'interested'
+            ? 'I am interested in this job.'
+            : 'I am not interested in this job.';
 
     try {
       await responseRef.add({
@@ -128,9 +167,9 @@ class _WorkerMessagesPageState extends State<WorkerMessagesPage> {
         'response': workerResponse,
         'timestamp': FieldValue.serverTimestamp(),
         'message':
-            workerResponse == 'interested'
-                ? 'I am interested in this job.'
-                : 'I am not interested in this job.',
+            additionalMessage != null
+                ? '$baseMessage\n\nAdditional message: $additionalMessage'
+                : baseMessage,
         'status': 'sent',
       });
 
