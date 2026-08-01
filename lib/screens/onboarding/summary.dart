@@ -8,6 +8,7 @@ import 'package:nivetha123/screens/onboarding/checkbox_animation_page.dart';
 import '../../theme/branding.dart';
 import '../../main.dart';
 import '../../widgets/step_progress.dart';
+import '../../services/notification_service.dart';
 
 class Page5Summary extends StatefulWidget {
   final UserData userData;
@@ -126,6 +127,8 @@ class _Page5SummaryState extends State<Page5Summary> {
           .set({'userId': userId});
 
       widget.userData.userId = userId;
+
+      await NotificationService.init(userId: userId);
 
       setState(() => _isLoading = false);
 

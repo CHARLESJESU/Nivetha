@@ -36,6 +36,7 @@ import '../shared/map_page.dart';
 import '../shared/profile_edit.dart';
 import 'worker_messages.dart';
 import '../../theme/branding.dart';
+import '../../services/notification_service.dart';
 
 
 class Workerpage extends StatefulWidget {
@@ -478,19 +479,32 @@ class _WorkerpageState extends State<Workerpage> {
             const SizedBox(width: 8),
             _buildNavItem(icon: Icons.assignment_rounded, label: 'Job Status', index: 1),
             const SizedBox(width: 8),
-            _buildNavItem(icon: Icons.message_rounded, label: 'Messages', index: 2),
+            _buildNavItem(
+              icon: Icons.message_rounded,
+              label: 'Messages',
+              index: 2,
+              badge: NotificationService.chatUnreadCount,
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildNavItem({required IconData icon, required String label, required int index}) {
+  Widget _buildNavItem({
+    required IconData icon,
+    required String label,
+    required int index,
+    ValueNotifier<int>? badge,
+  }) {
     final bool selected = _selectedIndex == index;
     return Expanded(
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        onTap: () => setState(() => _selectedIndex = index),
+        onTap: () {
+          setState(() => _selectedIndex = index);
+          badge?.value = 0;
+        },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(vertical: 10),
@@ -501,7 +515,36 @@ class _WorkerpageState extends State<Workerpage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, color: selected ? WNColors.blue : Colors.black45, size: 24),
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Icon(icon, color: selected ? WNColors.blue : Colors.black45, size: 24),
+                  if (badge != null)
+                    Positioned(
+                      right: -6,
+                      top: -4,
+                      child: ValueListenableBuilder<int>(
+                        valueListenable: badge,
+                        builder: (context, count, _) {
+                          if (count <= 0) return const SizedBox.shrink();
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                            constraints: const BoxConstraints(minWidth: 16),
+                            decoration: BoxDecoration(
+                              color: Colors.red,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              count > 9 ? '9+' : '$count',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
               const SizedBox(height: 4),
               Text(
                 label,

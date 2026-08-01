@@ -6,6 +6,7 @@ import 'package:nivetha123/screens/worker/worker_home.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../auth/login.dart';
 import '../../models/user_data.dart';
+import '../../services/notification_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -37,6 +38,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
     // Navigate based on login status and user role
     if (isLoggedIn && userData != null) {
+      await NotificationService.init(userId: userData.userId);
       if (isWorker) {
         // Navigate to WorkerPage
         Get.off(() => Workerpage(userData: userData!));

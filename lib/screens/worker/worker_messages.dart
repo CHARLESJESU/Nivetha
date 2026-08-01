@@ -17,6 +17,7 @@ class _WorkerMessagesPageState extends State<WorkerMessagesPage> {
   // the actual source of truth is always Firestore, not local state, since
   // this page gets rebuilt fresh every time the worker switches tabs.
   final Map<String, String?> _responseCache = {};
+  final Set<String> _respondingKeys = {};
 
   Future<void> _sendResponseToJobProvider({
     required String jobProviderId,
@@ -203,20 +204,36 @@ class _WorkerMessagesPageState extends State<WorkerMessagesPage> {
                               );
                             }
 
+                            final isResponding = _respondingKeys.contains(key);
+
+                            Future<void> respond(String response) async {
+                              setState(() => _respondingKeys.add(key));
+                              try {
+                                await _sendResponseToJobProvider(
+                                  jobProviderId: from,
+                                  workerResponse: response,
+                                  postId: postId,
+                                );
+                                if (!mounted) return;
+                                setState(() => _responseCache[key] = response);
+                                if (response == 'interested') _navigateToChat(postId, from);
+                              } finally {
+                                if (mounted) setState(() => _respondingKeys.remove(key));
+                              }
+                            }
+
                             return Row(
                               children: [
                                 Expanded(
                                   child: ElevatedButton.icon(
-                                    onPressed: () async {
-                                      await _sendResponseToJobProvider(
-                                        jobProviderId: from,
-                                        workerResponse: 'interested',
-                                        postId: postId,
-                                      );
-                                      setState(() => _responseCache[key] = 'interested');
-                                      _navigateToChat(postId, from);
-                                    },
-                                    icon: const Icon(Icons.chat_bubble_outline, size: 18, color: Colors.white),
+                                    onPressed: isResponding ? null : () => respond('interested'),
+                                    icon: isResponding
+                                        ? const SizedBox(
+                                            width: 16,
+                                            height: 16,
+                                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                          )
+                                        : const Icon(Icons.chat_bubble_outline, size: 18, color: Colors.white),
                                     label: const Text("I'm interested", style: TextStyle(color: Colors.white)),
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: WNColors.blue,
@@ -228,19 +245,18 @@ class _WorkerMessagesPageState extends State<WorkerMessagesPage> {
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: OutlinedButton(
-                                    onPressed: () async {
-                                      await _sendResponseToJobProvider(
-                                        jobProviderId: from,
-                                        workerResponse: 'not_interested',
-                                        postId: postId,
-                                      );
-                                      setState(() => _responseCache[key] = 'not_interested');
-                                    },
+                                    onPressed: isResponding ? null : () => respond('not_interested'),
                                     style: OutlinedButton.styleFrom(
                                       side: const BorderSide(color: Colors.black26),
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                     ),
-                                    child: const Text("Not interested", style: TextStyle(color: Colors.black54)),
+                                    child: isResponding
+                                        ? const SizedBox(
+                                            width: 16,
+                                            height: 16,
+                                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black45),
+                                          )
+                                        : const Text("Not interested", style: TextStyle(color: Colors.black54)),
                                   ),
                                 ),
                               ],

@@ -72,6 +72,7 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
   List<bool> showOrderDetails = [];
   bool isLoading = true;
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _subscription;
+  final Set<String> updatingWorkerIds = {};
 
   @override
   void initState() {
@@ -130,6 +131,8 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
       String workerUserId,
       String newStatus,
       ) async {
+    final key = '$orderId|$workerUserId';
+    setState(() => updatingWorkerIds.add(key));
     try {
       final firestore = FirebaseFirestore.instance;
 
@@ -172,12 +175,15 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
         });
       }
 
-      // Optional UI update for rejected status
-      if (newStatus == 'rejected') {
+      // Update local state in place so the button reflects the new status
+      // immediately, without waiting on the posts-level stream to re-fire
+      // (it doesn't, since this write is to a nested workers subcollection).
+      if (mounted) {
         setState(() {
-          groupedApplications[orderId]!
-              .firstWhere((app) => app.userId == workerUserId)
-              .showDetails = false;
+          final app = groupedApplications[orderId]!
+              .firstWhere((app) => app.userId == workerUserId);
+          app.status = newStatus;
+          if (newStatus == 'rejected') app.showDetails = false;
         });
       }
 
@@ -196,6 +202,8 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
           message: 'Failed to update status: $e',
         );
       }
+    } finally {
+      if (mounted) setState(() => updatingWorkerIds.remove(key));
     }
   }
 
@@ -445,13 +453,6 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
                           ),
                         ),
                         Text(
-                          'User ID: ${worker.userId}',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: Colors.black45,
-                          ),
-                        ),
-                        Text(
                           'Status: ${worker.status}',
                           style: TextStyle(
                             fontSize: 13,
@@ -496,58 +497,80 @@ class _ApplicationsPageState extends State<ApplicationsPage> {
                       _detailText('Area', worker.area),
                       _detailText('Address', worker.address),
                       const SizedBox(height: 8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed:
-                                  status == 'applied'
-                                      ? () => _confirmAndUpdate(
-                                        orderId,
-                                        worker.userId,
-                                        'accepted',
-                                      )
-                                      : null,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green,
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
+                      Builder(builder: (context) {
+                        final isUpdating =
+                            updatingWorkerIds.contains('$orderId|${worker.userId}');
+                        return Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed:
+                                    status == 'applied' && !isUpdating
+                                        ? () => _confirmAndUpdate(
+                                          orderId,
+                                          worker.userId,
+                                          'accepted',
+                                        )
+                                        : null,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.green,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
                                 ),
-                              ),
-                              child: const Text(
-                                'Accept',
-                                style: TextStyle(color: Colors.white),
+                                child: isUpdating
+                                    ? const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : const Text(
+                                        'Accept',
+                                        style: TextStyle(color: Colors.white),
+                                      ),
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed:
-                                  status == 'applied'
-                                      ? () => _confirmAndUpdate(
-                                        orderId,
-                                        worker.userId,
-                                        'rejected',
-                                      )
-                                      : null,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.red,
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed:
+                                    status == 'applied' && !isUpdating
+                                        ? () => _confirmAndUpdate(
+                                          orderId,
+                                          worker.userId,
+                                          'rejected',
+                                        )
+                                        : null,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.red,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
                                 ),
-                              ),
-                              child: const Text(
-                                'Reject',
-                                style: TextStyle(color: Colors.white),
+                                child: isUpdating
+                                    ? const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : const Text(
+                                        'Reject',
+                                        style: TextStyle(color: Colors.white),
+                                      ),
                               ),
                             ),
-                          ),
-                        ],
-                      ),
+                          ],
+                        );
+                      }),
                     ],
                   ),
                 ),

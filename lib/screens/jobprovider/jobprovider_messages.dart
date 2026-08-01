@@ -41,10 +41,27 @@ class _MessagesPageState extends State<MessagesPage> {
           fetchedMessages.add({
             'workerId': data['from'] ?? 'Unknown',
             'postId': data['postId'] ?? 'Unknown',
-            'message': data['message'] ?? 'No message',
+            'response': data['response'],
             'timestamp': data['timestamp'],
           });
         }
+      }
+
+      // Resolve worker names once per distinct workerId instead of showing raw ids.
+      final workerIds = fetchedMessages.map((m) => m['workerId'] as String).toSet();
+      final names = <String, String>{};
+      for (final workerId in workerIds) {
+        final userType = workerId.startsWith('JO') ? 'jobproviders' : 'workers';
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userType)
+            .collection(userType)
+            .doc(workerId)
+            .get();
+        names[workerId] = userDoc.data()?['name'] ?? workerId;
+      }
+      for (final m in fetchedMessages) {
+        m['workerName'] = names[m['workerId']];
       }
 
       setState(() {
@@ -143,9 +160,12 @@ class _MessagesPageState extends State<MessagesPage> {
                             ),
                             child: const Icon(Icons.message, color: WNColors.blue),
                           ),
-                          title: Text(msg['message'], style: const TextStyle(fontWeight: FontWeight.w600, color: WNColors.navy)),
+                          title: Text(
+                            msg['workerName'] ?? 'Unknown',
+                            style: const TextStyle(fontWeight: FontWeight.w600, color: WNColors.navy),
+                          ),
                           subtitle: Text(
-                            'Worker ID: ${msg['workerId']} • Post ID: ${msg['postId']}',
+                            msg['response'] == 'interested' ? "I'm interested" : "Not interested",
                             style: const TextStyle(fontSize: 12, color: Colors.black45),
                           ),
                           trailing: msg['timestamp'] != null

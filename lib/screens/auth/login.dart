@@ -11,6 +11,7 @@ import '../../models/user_data.dart';
 import 'signup.dart';
 import 'forgot_password.dart'; // Import the new ForgotPasswordScreen
 import '../../theme/branding.dart';
+import '../../services/notification_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -87,6 +88,7 @@ class _LoginScreenState extends State<LoginScreen> {
         // Now you can use `data['fieldName']` safely
         // Ensure correct type
         final userData = UserData.fromJson(data);
+        await NotificationService.init(userId: userexist);
         // Navigator.of(context).pushReplacement(
         //
         //   MaterialPageRoute(

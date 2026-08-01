@@ -15,7 +15,20 @@ import '../../theme/branding.dart';
 class FormPage extends StatefulWidget {
   final String userId;
 
-  FormPage({required this.userId});
+  // When set, the form edits this existing order instead of creating a new
+  // one — same UI, prefilled with the order's current description/image.
+  final String? orderId;
+  final String? initialDescription;
+  final String? initialImageBase64;
+
+  FormPage({
+    required this.userId,
+    this.orderId,
+    this.initialDescription,
+    this.initialImageBase64,
+  });
+
+  bool get isEditing => orderId != null;
 
   @override
   _FormPageState createState() => _FormPageState();
@@ -23,16 +36,22 @@ class FormPage extends StatefulWidget {
 
 class _FormPageState extends State<FormPage> {
   File? _imageFile;
+  String? _existingImageBase64;
   final TextEditingController _descriptionController = TextEditingController();
-  final CollectionReference _jobCollection = FirebaseFirestore.instance
-      .collection('jobs')
-      .doc('workers')
-      .collection('workers');
 
   bool _isUploading = false;
 
   bool _showSuccessAnimation = false;
   String _generatedOrderId = '';
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialDescription != null) {
+      _descriptionController.text = widget.initialDescription!;
+    }
+    _existingImageBase64 = widget.initialImageBase64;
+  }
 
   Future<void> _pickImage() async {
     final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
@@ -94,7 +113,8 @@ class _FormPageState extends State<FormPage> {
       return;
     }
 
-    if (_imageFile == null || _descriptionController.text.isEmpty) {
+    final hasImage = _imageFile != null || (_existingImageBase64?.isNotEmpty ?? false);
+    if (!hasImage || _descriptionController.text.isEmpty) {
       showWNMessage(context, isError: true, message: "Please select an image and enter a description");
       return;
     }
@@ -105,13 +125,10 @@ class _FormPageState extends State<FormPage> {
 
     try {
       final userId = widget.userId;
-      print(_imageFile);
 
-      final base64Image = await compressAndConvertToBase64(_imageFile!.path);
-      print(base64Image);
-
-      final rawOrderId = _generateOrderId();
-      final orderKey = 'OID_$rawOrderId';
+      final base64Image = _imageFile != null
+          ? await compressAndConvertToBase64(_imageFile!.path)
+          : _existingImageBase64;
 
       final userDocRef = FirebaseFirestore.instance
           .collection('jobs')
@@ -119,30 +136,39 @@ class _FormPageState extends State<FormPage> {
           .collection('workers')
           .doc(userId);
 
-// ✅ First, set a field in the user doc
-      await userDocRef.set(
-          {'summa': 1}, SetOptions(merge: true)); // merge to avoid overwrite
+      final orderKey = widget.orderId ?? 'OID_${_generateOrderId()}';
 
-// ✅ Then, add order to the subcollection
-      await userDocRef
-          .collection('order')
-          .doc(orderKey)
-          .set({
-        'orderkey': orderKey,
-        'description': _descriptionController.text,
-        'imageBase64': base64Image,
-      });
+      if (widget.isEditing) {
+        await userDocRef.collection('order').doc(orderKey).update({
+          'description': _descriptionController.text,
+          'imageBase64': base64Image,
+        });
+      } else {
+        // First, set a field in the user doc (merge to avoid overwrite).
+        await userDocRef.set({'summa': 1}, SetOptions(merge: true));
+        await userDocRef.collection('order').doc(orderKey).set({
+          'orderkey': orderKey,
+          'description': _descriptionController.text,
+          'imageBase64': base64Image,
+        });
+      }
 
       setState(() {
         _showSuccessAnimation = true;
         _generatedOrderId = orderKey;
       });
 
-      Future.delayed(Duration(seconds: 3), () {
+      Future.delayed(Duration(seconds: widget.isEditing ? 2 : 3), () {
         if (mounted) Navigator.of(context).pop();
       });
-    }catch (e) {
-      if (mounted) showWNMessage(context, isError: true, message: "Failed to post job: $e");
+    } catch (e) {
+      if (mounted) {
+        showWNMessage(
+          context,
+          isError: true,
+          message: "Failed to ${widget.isEditing ? 'update' : 'post'} job: $e",
+        );
+      }
     } finally {
       setState(() {
         _isUploading = false;
@@ -162,9 +188,9 @@ class _FormPageState extends State<FormPage> {
     return Scaffold(
       backgroundColor: WNColors.bg,
       appBar: AppBar(
-        title: const Text(
-          "Post Job",
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+        title: Text(
+          widget.isEditing ? "Edit Job" : "Post Job",
+          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
         ),
         backgroundColor: WNColors.blue,
         elevation: 0,
@@ -228,6 +254,16 @@ class _FormPageState extends State<FormPage> {
                               fit: BoxFit.cover,
                             ),
                           )
+                        : (_existingImageBase64?.isNotEmpty ?? false)
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(14),
+                            child: Image.memory(
+                              base64Decode(_existingImageBase64!),
+                              height: 200,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                            ),
+                          )
                         : Container(
                             height: 200,
                             decoration: BoxDecoration(
@@ -270,9 +306,9 @@ class _FormPageState extends State<FormPage> {
                                 valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                               ),
                             )
-                          : const Text(
-                              "Post Job",
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white),
+                          : Text(
+                              widget.isEditing ? "Update Job" : "Post Job",
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white),
                             ),
                     ),
                   ),
@@ -313,9 +349,9 @@ class _FormPageState extends State<FormPage> {
                         child: const Icon(Icons.check_circle, color: WNColors.blue, size: 44),
                       ),
                       const SizedBox(height: 16),
-                      const Text(
-                        "Job posted successfully!",
-                        style: TextStyle(
+                      Text(
+                        widget.isEditing ? "Job updated successfully!" : "Job posted successfully!",
+                        style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                           color: WNColors.navy,

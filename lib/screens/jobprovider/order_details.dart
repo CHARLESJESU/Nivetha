@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -6,6 +7,7 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../theme/branding.dart';
+import 'post_job.dart';
 
 class Order {
   final String id;
@@ -33,6 +35,7 @@ class OrderDetailsPage extends StatefulWidget {
 class _OrderDetailsPageState extends State<OrderDetailsPage> {
   List<Order> orders = [];
   bool isLoading = true;
+  StreamSubscription<QuerySnapshot>? _subscription;
 
   @override
   void initState() {
@@ -40,44 +43,53 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
     _loadOrders();
   }
 
-  Future<void> _loadOrders() async {
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    super.dispose();
+  }
+
+  void _loadOrders() {
     final userId = widget.userId;
 
-    try {
-      final DocumentReference userDocRef = FirebaseFirestore.instance
-          .collection('jobs')
-          .doc('workers')
-          .collection('workers')
-          .doc(userId);
+    final CollectionReference ordersRef = FirebaseFirestore.instance
+        .collection('jobs')
+        .doc('workers')
+        .collection('workers')
+        .doc(userId)
+        .collection('order');
 
-      final CollectionReference ordersRef = userDocRef.collection('order');
-      final QuerySnapshot snapshot = await ordersRef.get();
+    _subscription?.cancel();
+    _subscription = ordersRef.snapshots().listen(
+      (snapshot) {
+        if (!mounted) return;
 
-      List<Order> fetchedOrders = [];
+        List<Order> fetchedOrders = [];
+        for (var doc in snapshot.docs) {
+          final data = doc.data() as Map<String, dynamic>;
+          fetchedOrders.add(
+            Order(
+              id: doc.id,
+              orderId: data['orderId']?.toString() ?? doc.id,
+              description: data['description'] ?? '',
+              imageBase64: data['imageBase64'] ?? '',
+            ),
+          );
+        }
 
-      for (var doc in snapshot.docs) {
-        final data = doc.data() as Map<String, dynamic>;
-        fetchedOrders.add(
-          Order(
-            id: doc.id,
-            orderId: data['orderId']?.toString() ?? doc.id,
-            description: data['description'] ?? '',
-            imageBase64: data['imageBase64'] ?? '',
-          ),
-        );
-      }
+        fetchedOrders.sort((a, b) => b.id.compareTo(a.id));
 
-      fetchedOrders.sort((a, b) => b.id.compareTo(a.id));
-
-      setState(() {
-        orders = fetchedOrders;
-        isLoading = false;
-      });
-    } catch (e) {
-      setState(() => isLoading = false);
-      if (mounted) showWNMessage(context, isError: true, message: "Failed to load orders: $e");
-    }
-
+        setState(() {
+          orders = fetchedOrders;
+          isLoading = false;
+        });
+      },
+      onError: (e) {
+        if (!mounted) return;
+        setState(() => isLoading = false);
+        showWNMessage(context, isError: true, message: "Failed to load orders: $e");
+      },
+    );
   }
 
   Uint8List _decodeBase64(String base64String) {
@@ -119,68 +131,17 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
   }
 
 
-  Future<void> _editOrder(String postId, String currentDescription) async {
-    TextEditingController _editController = TextEditingController(
-      text: currentDescription,
-    );
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text("Edit Description", style: TextStyle(color: WNColors.navy, fontWeight: FontWeight.bold)),
-          content: TextField(
-            controller: _editController,
-            maxLines: 3,
-            decoration: InputDecoration(
-              labelText: 'Enter new description',
-              focusedBorder: OutlineInputBorder(
-                borderSide: const BorderSide(color: WNColors.blue, width: 2),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel', style: TextStyle(color: Colors.black54)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: WNColors.blue,
-                elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              onPressed: () async {
-                String newDescription = _editController.text;
-                if (newDescription.isEmpty) {
-                  showWNMessage(context, isError: true, message: "Description cannot be empty");
-                  return;
-                }
-
-                try {
-                  await FirebaseFirestore.instance
-                      .collection('jobs')
-                      .doc('workers')
-                      .collection('workers')
-                      .doc("${widget.userId}-${postId}")
-                      .update({'description': newDescription});
-
-                  Navigator.pop(context);
-                  _loadOrders();
-                  if (mounted) showWNMessage(context, message: "Updated successfully");
-                } catch (e) {
-                  showWNMessage(context, isError: true, message: "Failed to update: ${e.toString()}");
-                }
-
-              },
-              child: const Text('Save', style: TextStyle(color: Colors.white)),
-            ),
-          ],
-        );
-      },
+  void _editOrder(Order order) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => FormPage(
+          userId: widget.userId,
+          orderId: order.id,
+          initialDescription: order.description,
+          initialImageBase64: order.imageBase64,
+        ),
+      ),
     );
   }
 
@@ -192,7 +153,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
           ? const Center(child: CircularProgressIndicator(color: WNColors.blue))
           : RefreshIndicator(
         color: WNColors.blue,
-        onRefresh: _loadOrders,
+        onRefresh: () async => _loadOrders(),
         child: orders.isEmpty
             ? ListView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -240,7 +201,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                         PopupMenuButton<String>(
                           onSelected: (value) {
                             if (value == 'edit') {
-                              _editOrder(order.id, order.description);
+                              _editOrder(order);
                             } else if (value == 'delete') {
                               _deleteOrder(order.id);
                             }

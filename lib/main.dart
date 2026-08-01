@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:nivetha123/screens/splash/splash_screen.dart';
+import 'package:nivetha123/services/notification_service.dart';
 
 String globalEmail = '';
 Future<void> main() async {
@@ -37,6 +38,7 @@ class _MyappState extends State<Myapp> {
   @override
   Widget build(BuildContext context) {
     return GetMaterialApp(
+      navigatorKey: NotificationService.navigatorKey,
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
